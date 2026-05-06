@@ -1,8 +1,8 @@
-# Chandler's World — Map Builder Reference
+# The Chicken Coop — Map Builder Reference
 
 ## Overview
 
-`map-builder.html` is a standalone level-design tool for Chandler's World. It produces versioned JSON files that describe a level's cell grid, which can be consumed by the game to generate walls, objects, and entity spawn positions.
+`map-builder.html` is a standalone level-design tool for The Chicken Coop. It produces versioned JSON files that describe a level's cell grid, which can be consumed by the game to generate walls, objects, and entity spawn positions.
 
 ---
 
@@ -50,6 +50,24 @@ One optional object placed inside the cell. Fills the cell's 64 × 64 area.
 | `wall` | Immovable | Blocks Jax and Chandler |
 | `mud` | Passable | Slows Jax (`speedMult`) |
 | `pushable` | Movable | Jax can push it; also blocks Chandler |
+| `locker` | Immovable | Metal school locker — typically placed against a wall |
+| `desk` | Immovable | Wooden classroom desk |
+| `door` | Passable | Open doorway decoration |
+| `blackboard` | Immovable | Chalkboard — typically placed against a wall |
+
+### Rotation
+Controls how an object is oriented within its cell. Applied as a clockwise rotation around the cell center. Most useful for edge-anchored objects (lockers, blackboards, desks) that should face a specific wall.
+
+| Value | Meaning |
+|-------|---------|
+| `0` | Default orientation (object faces south / bottom of cell) |
+| `90` | Rotated 90° clockwise (object faces west) |
+| `180` | Rotated 180° (object faces north) |
+| `270` | Rotated 270° clockwise (object faces east) |
+
+Keyboard shortcut **R** cycles the selected cell's rotation through 0 → 90 → 180 → 270 → 0.
+
+Rotation is stored per-cell regardless of object type. For full-cell objects (`wall`, `mud`) rotation has no visual effect.
 
 ### Special
 One optional special designation per cell. Only one of each type may exist per map.
@@ -77,12 +95,14 @@ All three are required to export the map.
       "background": "hallway",
       "borders": { "n": false, "s": false, "e": false, "w": true },
       "object": null,
+      "rotation": 0,
       "special": "player"
     },
     "6,12": {
       "background": "hallway",
       "borders": { "n": false, "s": false, "e": false, "w": false },
-      "object": "pushable",
+      "object": "locker",
+      "rotation": 180,
       "special": null
     }
   }
@@ -101,6 +121,7 @@ All three are required to export the map.
 | `cells[k].background` | string | Background style key |
 | `cells[k].borders` | object | `{ n, s, e, w }` — each boolean; `true` = wall on that edge |
 | `cells[k].object` | string \| null | Object kind, or `null` for no object |
+| `cells[k].rotation` | integer | Clockwise rotation in degrees: `0`, `90`, `180`, or `270` (default `0`) |
 | `cells[k].special` | string \| null | `"player"`, `"exit"`, `"villain"`, or `null` |
 
 ### Versioning
@@ -134,6 +155,8 @@ When a breaking change is made to the format, increment `version` in both the bu
 | `S` | Switch to Select tool |
 | `P` | Switch to Paint tool |
 | `E` | Switch to Erase tool |
+| `R` | Rotate selected cell's object 90° clockwise |
+| `G` | Toggle Builder / Game preview mode |
 | `+` / `=` | Zoom in |
 | `-` | Zoom out |
 | Arrow keys | Pan the grid |
@@ -192,5 +215,5 @@ map_height = max_row * 64 + 64
 - [ ] Copy / paste cell regions
 - [ ] Undo / redo stack
 - [ ] Preview mode (renders the cell in game-accurate art)
-- [ ] Named map metadata (level name, Chandler speed override)
-- [ ] Game importer that reads map JSON into `generateLevelObjects()`
+- [ ] Named map metadata (level name, Chandler speed override, author)
+- [x] Game importer — `buildObjectsFromMap()` and `drawMapFromCells()` in `index.html`

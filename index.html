@@ -2,11 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Chandler's World — Level 1</title>
+<title>The Chicken Coop</title>
+<script src="games/catalog.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0d1a; font-family: monospace; }
   canvas { display: block; image-rendering: pixelated; cursor: none; }
+  canvas.lobby { cursor: pointer; }
 </style>
 </head>
 <body>
@@ -15,15 +17,16 @@
 // ─────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────
-const MAP_W = 3200, MAP_H = 2400;
+let MAP_W = 3200, MAP_H = 2400;
 const PLAYER_SIZE = 28;
 const CHANDLER_SIZE = 34;
 const PLAYER_SPEED = 220;
-const CHANDLER_SPEED = 75;
+let CHANDLER_SPEED = 75;
 const WALL_THICK = 14;
 const PUSH_FORCE = 280;
 const PUSH_DRAG = 5;
 const TILE = 32;
+const CELL = 64;   // map-builder cell size in game-world pixels
 
 // ─────────────────────────────────────────────
 // CANVAS SETUP — viewport sized, camera follows Jax
@@ -55,11 +58,34 @@ canvas.addEventListener('mousemove', e => {
   mouse.y = (e.clientY - r.top) + camera.y;
 });
 canvas.addEventListener('click', handleClick);
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (gameState === 'level_select') {
+      gameState = 'lobby';
+      buttons = [];
+    } else if (gameState !== 'lobby') {
+      gameState = 'lobby';
+      buttons = [];
+    }
+    return;
+  }
+  if (gameState === 'level_select') {
+    if (e.key === 'Backspace') {
+      codeInput = codeInput.slice(0, -1);
+      codeError = false;
+    } else if (e.key === 'Enter') {
+      submitCode();
+    } else if (/^[a-zA-Z0-9]$/.test(e.key) && codeInput.length < 6) {
+      codeInput += e.key.toUpperCase();
+      codeError = false;
+    }
+  }
+});
 
 // ─────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────
-let gameState = 'playing';
+let gameState = 'lobby';
 let levelTime = 0;
 let jax = { x: 160, y: 2100, vx: 0, vy: 0, color: '#4dabf7', size: PLAYER_SIZE,
             facing: 1, walkTime: 0, moving: false };
@@ -68,8 +94,10 @@ let camera = { x: 0, y: 0 };
 let buttons = [];
 let activeBuffs = [];
 let exitPulse = 0;
+let exitPos = { x: 3060, y: 200, w: 90, h: 90 };
 let objects = [];
 let particles = [];
+let currentMapData = null;  // null = use hardcoded level; set = play a JSON map
 
 // ─────────────────────────────────────────────
 // PALETTE — SNES School
@@ -143,9 +171,38 @@ function makeClassTilePattern() {
 }
 
 let hallPattern, classPattern;
+let tilePatterns = {};
+
+function makeSolidPattern(colorA, colorB) {
+  const oc = document.createElement('canvas');
+  oc.width = TILE * 2; oc.height = TILE * 2;
+  const c = oc.getContext('2d');
+  c.fillStyle = colorA; c.fillRect(0, 0, TILE*2, TILE*2);
+  c.fillStyle = colorB;
+  c.fillRect(0, 0, TILE, TILE);
+  c.fillRect(TILE, TILE, TILE, TILE);
+  c.strokeStyle = 'rgba(0,0,0,0.15)'; c.lineWidth = 1.5;
+  c.strokeRect(1, 1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, 1, TILE-2, TILE-2);
+  c.strokeRect(1, TILE+1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, TILE+1, TILE-2, TILE-2);
+  return ctx.createPattern(oc, 'repeat');
+}
+
 function initPatterns() {
-  hallPattern = makeHallTilePattern();
+  hallPattern  = makeHallTilePattern();
   classPattern = makeClassTilePattern();
+  tilePatterns = {
+    empty:      makeSolidPattern('#1a0f06', '#120a04'),
+    hallway:    hallPattern,
+    classroom:  classPattern,
+    cafeteria:  makeSolidPattern('#e0c890', '#c8b078'),
+    carpet:     makeSolidPattern('#6b7a8b', '#5a6878'),
+    grass:      makeSolidPattern('#5a8a3a', '#4a7530'),
+    dirt:       makeSolidPattern('#8b6535', '#6b4825'),
+    concrete:   makeSolidPattern('#9a9a9a', '#808080'),
+    asphalt:    makeSolidPattern('#3a3a3a', '#2a2a2a'),
+  };
 }
 
 // ─────────────────────────────────────────────
@@ -206,6 +263,8 @@ const classZones = makeClassZones();
 // DRAW MAP — SNES style
 // ─────────────────────────────────────────────
 function drawMap() {
+  if (currentMapData) { drawMapFromCells(currentMapData); return; }
+
   // 1. Fill entire map with outer wall (brick) colour
   ctx.fillStyle = PAL.wallFace;
   ctx.fillRect(0, 0, MAP_W, MAP_H);
@@ -692,6 +751,105 @@ function buildPickups() {
 }
 
 // ─────────────────────────────────────────────
+// MAP JSON IMPORTER
+// ─────────────────────────────────────────────
+
+// Build objects[] from a map-builder JSON map.
+// Border walls are deduplicated so shared cell edges don't double up.
+// Immovable objects (locker, desk, blackboard) produce edge-flush wall strips
+// based on rotation so they don't block the full cell.
+function buildObjectsFromMap(mapData) {
+  const objs = [];
+  const wallKeys = new Set();
+
+  function addWall(wkey, x, y, w, h) {
+    if (wallKeys.has(wkey)) return;
+    wallKeys.add(wkey);
+    objs.push({ x, y, w, h, kind: 'wall', vx: 0, vy: 0 });
+  }
+
+  for (const [key, cell] of Object.entries(mapData.cells)) {
+    const [col, row] = key.split(',').map(Number);
+    const cx = col * CELL, cy = row * CELL;
+
+    // Border walls — keyed by canonical edge so adjacent cells share one wall
+    if (cell.borders.n) addWall(`H:${col},${row}`,   cx, cy,                    CELL, WALL_THICK);
+    if (cell.borders.s) addWall(`H:${col},${row+1}`, cx, cy + CELL - WALL_THICK, CELL, WALL_THICK);
+    if (cell.borders.w) addWall(`V:${col},${row}`,   cx, cy,                    WALL_THICK, CELL);
+    if (cell.borders.e) addWall(`V:${col+1},${row}`, cx + CELL - WALL_THICK, cy, WALL_THICK, CELL);
+
+    // In-cell objects
+    if (!cell.object) continue;
+    const rot = cell.rotation || 0;
+    const thick = 16; // wall strip thickness for edge-anchored objects
+
+    switch (cell.object) {
+      case 'wall':
+        objs.push({ x: cx, y: cy, w: CELL, h: CELL, kind: 'wall', vx: 0, vy: 0 });
+        break;
+      case 'mud':
+        objs.push({ x: cx, y: cy, w: CELL, h: CELL, kind: 'mud', speedMult: 0.4 });
+        break;
+      case 'pushable': {
+        const ps = CELL - 20;
+        objs.push({ x: cx + (CELL - ps) / 2, y: cy + (CELL - ps) / 2,
+                    w: ps, h: ps, kind: 'pushable', vx: 0, vy: 0, type: 'chair' });
+        break;
+      }
+      // Edge-anchored immovables: strip on the wall they face
+      case 'locker':
+      case 'blackboard':
+      case 'desk': {
+        // rot 0=south-face (strip at top), 90=west-face (strip at right)
+        // 180=north-face (strip at bottom), 270=east-face (strip at left)
+        let wx = cx, wy = cy, ww = CELL, wh = thick;
+        if      (rot === 0)   { wx = cx;                 wy = cy;                 ww = CELL;  wh = thick; }
+        else if (rot === 90)  { wx = cx + CELL - thick;  wy = cy;                 ww = thick; wh = CELL;  }
+        else if (rot === 180) { wx = cx;                 wy = cy + CELL - thick;  ww = CELL;  wh = thick; }
+        else                  { wx = cx;                 wy = cy;                 ww = thick; wh = CELL;  }
+        objs.push({ x: wx, y: wy, w: ww, h: wh, kind: 'wall', vx: 0, vy: 0 });
+        break;
+      }
+      // door: passable — no collision object
+    }
+  }
+
+  return objs;
+}
+
+// Draw cell-based map backgrounds and border walls.
+function drawMapFromCells(mapData) {
+  ctx.fillStyle = '#1a0f06';
+  ctx.fillRect(0, 0, MAP_W, MAP_H);
+
+  for (const [key, cell] of Object.entries(mapData.cells)) {
+    const [col, row] = key.split(',').map(Number);
+    const x = col * CELL, y = row * CELL;
+    const pat = tilePatterns[cell.background] || tilePatterns.empty;
+    ctx.fillStyle = pat;
+    ctx.fillRect(x, y, CELL, CELL);
+  }
+
+  // Draw border walls on top as solid dark rectangles
+  const wallKeys = new Set();
+  for (const [key, cell] of Object.entries(mapData.cells)) {
+    const [col, row] = key.split(',').map(Number);
+    const x = col * CELL, y = row * CELL;
+
+    function drawBorderWall(wkey, wx, wy, ww, wh) {
+      if (wallKeys.has(wkey)) return;
+      wallKeys.add(wkey);
+      drawWallSegment(wx, wy, ww, wh);
+    }
+
+    if (cell.borders.n) drawBorderWall(`H:${col},${row}`,   x, y,                    CELL, WALL_THICK);
+    if (cell.borders.s) drawBorderWall(`H:${col},${row+1}`, x, y + CELL - WALL_THICK, CELL, WALL_THICK);
+    if (cell.borders.w) drawBorderWall(`V:${col},${row}`,   x, y,                    WALL_THICK, CELL);
+    if (cell.borders.e) drawBorderWall(`V:${col+1},${row}`, x + CELL - WALL_THICK, y, WALL_THICK, CELL);
+  }
+}
+
+// ─────────────────────────────────────────────
 // COLLISION
 // ─────────────────────────────────────────────
 function overlaps(a, b) {
@@ -734,8 +892,8 @@ function resolveSolids(entity, solids, isPushable, pushForce) {
 // A* PATHFINDING FOR CHANDLER
 // ─────────────────────────────────────────────
 const NAV_CELL = 20;  // finer grid — door gaps (56px) = ~2.8 cells wide, clearly passable
-const NAV_COLS = Math.ceil(MAP_W / NAV_CELL);
-const NAV_ROWS = Math.ceil(MAP_H / NAV_CELL);
+let NAV_COLS = Math.ceil(MAP_W / NAV_CELL);
+let NAV_ROWS = Math.ceil(MAP_H / NAV_CELL);
 
 let navGrid = null;       // Uint8Array: 0=open, 1=blocked
 let chandlerPath = [];    // array of {x,y} world-center waypoints
@@ -745,6 +903,8 @@ let stuckTimer = 0;       // detect when Chandler hasn't moved
 let stuckLastPos = {x:0, y:0};
 
 function buildNavGrid() {
+  NAV_COLS = Math.ceil(MAP_W / NAV_CELL);
+  NAV_ROWS = Math.ceil(MAP_H / NAV_CELL);
   navGrid = new Uint8Array(NAV_COLS * NAV_ROWS);
   const wallObjs = objects.filter(o => o.kind === 'wall');
   for (const w of wallObjs) {
@@ -966,7 +1126,7 @@ function buffPushVec() {
 // ENTITY DRAW
 // ─────────────────────────────────────────────
 function drawExit(t) {
-  const ex = 3060, ey = 200, es = 90;
+  const ex = exitPos.x, ey = exitPos.y, es = exitPos.w;
   const glow = 8 + Math.sin(t * 3) * 6;
   ctx.save();
   ctx.shadowColor = PAL.exitGlow;
@@ -1607,18 +1767,586 @@ function handleClick(e) {
   const cy = e.clientY - r.top;
   for (const btn of buttons) {
     if (cx >= btn.x && cx <= btn.x + btn.w && cy >= btn.y && cy <= btn.y + btn.h) {
+      const action = btn.action || btn.label;
       if (btn.label === 'TRY AGAIN' || btn.label === 'PLAY AGAIN') {
         resetLevel();
+      } else if (btn.label === 'NEW GAME') {
+        gameState = 'level_select';
+        buttons = [];
+        codeInput = '';
+        codeError = false;
+        levelTab = 'popular';
+        levelScroll = 0;
+      } else if (btn.label === 'MAP BUILDER') {
+        window.location.href = 'map-builder.html';
+      } else if (btn.label === '◀ LOBBY' || btn.label === 'BACK TO LOBBY') {
+        gameState = 'lobby';
+        buttons = [];
+      } else if (action && action.startsWith('tab:')) {
+        levelTab = action.slice(4);
+        levelScroll = 0;
+      } else if (action && action.startsWith('level:')) {
+        const code = action.slice(6);
+        const lvl = LEVEL_CATALOG.find(l => l.code === code);
+        if (lvl) startSelectedLevel(lvl);
+      } else if (action === 'code:go') {
+        submitCode();
       }
+      return;
     }
   }
+}
+
+// ─────────────────────────────────────────────
+// LOBBY SCREEN
+// ─────────────────────────────────────────────
+function drawLobby(t) {
+  // Backdrop — locker-blue gradient with subtle scanlines
+  const g = ctx.createLinearGradient(0, 0, 0, VH);
+  g.addColorStop(0, '#2a4f6a');
+  g.addColorStop(1, '#1a2f44');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, VW, VH);
+
+  // Scanlines
+  ctx.globalAlpha = 0.08;
+  ctx.fillStyle = '#000';
+  for (let y = 0; y < VH; y += 4) ctx.fillRect(0, y, VW, 2);
+  ctx.globalAlpha = 1;
+
+  // Locker strip across the bottom (visual continuity with Level 1)
+  const lockerY = VH - 140;
+  const lockerH = 110;
+  const lockerW = 70;
+  for (let x = 0; x < VW; x += lockerW + 4) {
+    drawLockerLobby(x, lockerY, lockerW, lockerH);
+  }
+
+  // Floor strip below lockers
+  ctx.fillStyle = PAL.floorDark;
+  ctx.fillRect(0, lockerY + lockerH, VW, VH - (lockerY + lockerH));
+  ctx.fillStyle = PAL.floorLight;
+  for (let x = 0; x < VW; x += 32) {
+    ctx.fillRect(x, lockerY + lockerH, 16, VH - (lockerY + lockerH));
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(0, lockerY + lockerH, VW, 3);
+
+  // Title plate
+  const cx = VW / 2;
+  const titleY = Math.max(120, VH * 0.20);
+
+  // Subtitle
+  ctx.fillStyle = '#f0c040';
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText("◆  A  S C H O O L  E S C A P E  ◆", cx, titleY - 50);
+
+  // Drop-shadow title
+  ctx.font = 'bold 84px monospace';
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillText("THE CHICKEN COOP", cx + 5, titleY + 5);
+  // Main title with red/yellow gradient
+  const tg = ctx.createLinearGradient(0, titleY - 60, 0, titleY + 20);
+  tg.addColorStop(0, '#ffd84a');
+  tg.addColorStop(1, '#e03040');
+  ctx.fillStyle = tg;
+  ctx.fillText("THE CHICKEN COOP", cx, titleY);
+
+  // Tagline
+  ctx.font = '15px monospace';
+  ctx.fillStyle = '#a8d4f0';
+  ctx.fillText("Outrun Chandler. Escape the school. Don't get a haircut.", cx, titleY + 36);
+
+  // Floating sprites flanking title — Jax on left, Chandler bobbing on right
+  const bob = Math.sin(t * 2) * 6;
+  drawLobbySprite(cx - 280, titleY - 30 + bob, 'jax', t);
+  drawLobbySprite(cx + 280, titleY - 30 - bob, 'chandler', t);
+
+  // Buttons — stacked, centered
+  const bw = 360, bh = 72;
+  const bx = cx - bw / 2;
+  const by1 = titleY + 110;
+  const by2 = by1 + bh + 22;
+
+  drawLobbyButton(bx, by1, bw, bh, 'NEW GAME', '#e03040', '#ffd84a', '▶');
+  drawLobbyButton(bx, by2, bw, bh, 'MAP BUILDER', '#4a7fa5', '#a8d4f0', '✎');
+
+  // Footer hint
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('MOUSE TO MOVE   •   ESC TO LOBBY', cx, by2 + bh + 36);
+}
+
+function drawLobbyButton(x, y, w, h, label, bg, fg, glyph) {
+  // Outer dark frame
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
+  // Body
+  ctx.fillStyle = bg;
+  ctx.fillRect(x, y, w, h);
+  // Top highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fillRect(x, y, w, 5);
+  ctx.fillRect(x, y, 5, h);
+  // Bottom shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(x, y + h - 5, w, 5);
+  ctx.fillRect(x + w - 5, y, 5, h);
+  // Bevel inset
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 6, y + 6, w - 12, h - 12);
+
+  // Glyph
+  ctx.fillStyle = fg;
+  ctx.font = 'bold 28px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(glyph, x + 38, y + h / 2);
+
+  // Label
+  ctx.font = 'bold 26px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x + w / 2 + 18, y + h / 2 + 1);
+  ctx.textBaseline = 'alphabetic';
+
+  buttons.push({ x, y, w, h, label });
+}
+
+// ─────────────────────────────────────────────
+// LEVEL MARKETPLACE — mock data, codes are 6-char alphanumeric
+// ─────────────────────────────────────────────
+// Official levels come from games/catalog.js (window.GAME_CATALOG).
+// Community and "mine" entries are placeholder stubs until a server is added.
+const LEVEL_CATALOG = [
+  ...(window.GAME_CATALOG || []),
+  // Popular community stubs
+  { code: 'K3F9PX', name: 'Locker Labyrinth',  author: 'mazebot',    best: 38.4, diff: 4, plays: 8210, theme: 'hallway',   cat: 'popular', featured: true },
+  { code: 'HX72QW', name: 'Two Chandlers',      author: 'evilqueen',  best: 91.3, diff: 5, plays: 5640, theme: 'office',    cat: 'popular' },
+  { code: 'VN44LM', name: 'Sneeze Guard Run',   author: 'lunchlady42',best: 44.0, diff: 3, plays: 4720, theme: 'cafeteria', cat: 'popular' },
+  { code: 'B8ZQ1R', name: 'Recess Riot',        author: 'monkeybars', best: 47.1, diff: 2, plays: 3990, theme: 'playground',cat: 'popular' },
+  { code: 'PM6GHT', name: 'Stolen Bases',       author: 'shortstop',  best: 68.8, diff: 4, plays: 3210, theme: 'baseball',  cat: 'popular' },
+  // User created stubs
+  { code: 'YOU001', name: 'My First Map',       author: 'you', best: null, diff: 1, plays: 3,  theme: 'hallway',   cat: 'mine' },
+  { code: 'YOU002', name: 'Spicy Cafeteria',    author: 'you', best: 28.5, diff: 3, plays: 14, theme: 'cafeteria', cat: 'mine' },
+  { code: 'YOU003', name: 'Office Nightmare',   author: 'you', best: null, diff: 5, plays: 1,  theme: 'office',    cat: 'mine' },
+];
+
+let levelTab = 'popular';   // popular | system | mine
+let codeInput = '';
+let codeError = false;
+let codeErrorShake = 0;
+let levelScroll = 0;
+
+function levelsForTab(tab) {
+  return LEVEL_CATALOG.filter(l => l.cat === tab);
+}
+
+function submitCode() {
+  const c = codeInput.trim().toUpperCase();
+  const found = LEVEL_CATALOG.find(l => l.code === c);
+  if (found) {
+    codeInput = '';
+    codeError = false;
+    startSelectedLevel(found);
+  } else {
+    codeError = true;
+    codeErrorShake = 0.5;
+  }
+}
+
+function startSelectedLevel(entry) {
+  currentMapData = entry.map || null;
+  CHANDLER_SPEED = entry.chandlerSpeed || 75;
+
+  if (currentMapData) {
+    let maxCol = 0, maxRow = 0;
+    for (const k of Object.keys(currentMapData.cells)) {
+      const [c, r] = k.split(',').map(Number);
+      if (c > maxCol) maxCol = c;
+      if (r > maxRow) maxRow = r;
+    }
+    MAP_W = (maxCol + 1) * CELL;
+    MAP_H = (maxRow + 1) * CELL;
+  }
+
+  resetLevel();
+}
+
+// ─────────────────────────────────────────────
+// LEVEL SELECT SCREEN
+// ─────────────────────────────────────────────
+function drawLevelSelect(t, dt) {
+  // Backdrop
+  const g = ctx.createLinearGradient(0, 0, 0, VH);
+  g.addColorStop(0, '#2a4f6a');
+  g.addColorStop(1, '#1a2f44');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, VW, VH);
+
+  // Subtle scanlines
+  ctx.globalAlpha = 0.06;
+  ctx.fillStyle = '#000';
+  for (let y = 0; y < VH; y += 4) ctx.fillRect(0, y, VW, 2);
+  ctx.globalAlpha = 1;
+
+  const cx = VW / 2;
+  const padX = Math.max(40, (VW - 1180) / 2);
+
+  // Header
+  ctx.fillStyle = '#ffd84a';
+  ctx.font = 'bold 36px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('SELECT LEVEL', padX, 70);
+  ctx.fillStyle = 'rgba(168,212,240,0.7)';
+  ctx.font = '13px monospace';
+  ctx.fillText('Pick from the marketplace, or punch in a code.', padX, 92);
+
+  // Back button
+  drawSmallButton(padX + 1180 - 120, 48, 120, 36, '◀ LOBBY', '#3d6d8f', '#a8d4f0');
+
+  // Code entry bar
+  const codeY = 120;
+  drawCodeEntry(padX, codeY, 1180, 70, dt);
+
+  // Tabs
+  const tabsY = codeY + 90;
+  const tabs = [
+    { key: 'popular', label: 'POPULAR' },
+    { key: 'system',  label: 'OFFICIAL' },
+    { key: 'mine',    label: 'MY LEVELS' },
+  ];
+  let tx = padX;
+  for (const tab of tabs) {
+    drawTab(tx, tabsY, 180, 42, tab.label, tab.key === levelTab, 'tab:' + tab.key);
+    tx += 188;
+  }
+  // Tab underline
+  ctx.fillStyle = 'rgba(255,216,74,0.25)';
+  ctx.fillRect(padX, tabsY + 42, 1180, 2);
+
+  // Cards
+  const list = levelsForTab(levelTab);
+  const cardW = 280, cardH = 200, gap = 16;
+  const colsPerRow = Math.max(1, Math.floor((1180 + gap) / (cardW + gap)));
+  const gridY = tabsY + 64;
+  const gridH = VH - gridY - 40;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(padX, gridY, 1180, gridH);
+  ctx.clip();
+
+  if (list.length === 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText("You haven't created any levels yet.", padX + 590, gridY + 80);
+    ctx.fillText("Open the MAP BUILDER from the lobby to make one.", padX + 590, gridY + 104);
+  } else {
+    for (let i = 0; i < list.length; i++) {
+      const col = i % colsPerRow;
+      const row = Math.floor(i / colsPerRow);
+      const x = padX + col * (cardW + gap);
+      const y = gridY + row * (cardH + gap) - levelScroll;
+      if (y + cardH < gridY || y > gridY + gridH) continue;
+      drawLevelCard(x, y, cardW, cardH, list[i]);
+    }
+  }
+  ctx.restore();
+}
+
+function drawCodeEntry(x, y, w, h, dt) {
+  // Shake decay
+  if (codeErrorShake > 0) codeErrorShake = Math.max(0, codeErrorShake - dt);
+  const shake = codeErrorShake > 0 ? Math.sin(codeErrorShake * 90) * 6 * (codeErrorShake / 0.5) : 0;
+
+  ctx.save();
+  ctx.translate(shake, 0);
+
+  // Frame
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = codeError ? '#e03040' : 'rgba(255,216,74,0.4)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+
+  // Label
+  ctx.fillStyle = codeError ? '#ff7a8a' : '#ffd84a';
+  ctx.font = 'bold 13px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(codeError ? 'CODE NOT FOUND' : 'ENTER LEVEL CODE', x + 18, y + 20);
+
+  // 6 character slots
+  const slotW = 50, slotH = 40, slotGap = 8;
+  const slotsW = slotW * 6 + slotGap * 5;
+  const slotX = x + 18;
+  const slotY = y + h / 2 - slotH / 2 + 6;
+  for (let i = 0; i < 6; i++) {
+    const sx = slotX + i * (slotW + slotGap);
+    ctx.fillStyle = '#0e1822';
+    ctx.fillRect(sx, slotY, slotW, slotH);
+    ctx.strokeStyle = i === codeInput.length ? '#ffd84a' : 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(sx, slotY, slotW, slotH);
+    if (codeInput[i]) {
+      ctx.fillStyle = codeError ? '#ff7a8a' : '#a8d4f0';
+      ctx.font = 'bold 26px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(codeInput[i], sx + slotW / 2, slotY + slotH / 2 + 1);
+      ctx.textBaseline = 'alphabetic';
+    } else if (i === codeInput.length && Math.floor(t * 2) % 2 === 0) {
+      ctx.fillStyle = '#ffd84a';
+      ctx.fillRect(sx + slotW / 2 - 1, slotY + 8, 2, slotH - 16);
+    }
+  }
+
+  // GO button
+  const goX = slotX + slotsW + 24;
+  const goW = w - (slotX - x) - slotsW - 24 - 18;
+  drawSmallButton(goX, slotY, goW, slotH, '▶  GO', codeInput.length === 6 ? '#e03040' : '#5a3a3a', '#ffd84a', 'code:go');
+
+  ctx.restore();
+}
+
+function drawTab(x, y, w, h, label, active, action) {
+  ctx.fillStyle = active ? '#e03040' : 'rgba(255,255,255,0.06)';
+  ctx.fillRect(x, y, w, h);
+  if (active) {
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(x, y, w, 3);
+  }
+  ctx.fillStyle = active ? '#fff' : 'rgba(255,255,255,0.55)';
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + w / 2, y + h / 2 + 1);
+  ctx.textBaseline = 'alphabetic';
+  buttons.push({ x, y, w, h, label, action });
+}
+
+function drawSmallButton(x, y, w, h, label, bg, fg, action) {
+  ctx.fillStyle = bg;
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.fillRect(x, y, w, 3);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(x, y + h - 3, w, 3);
+  ctx.fillStyle = fg;
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + w / 2, y + h / 2 + 1);
+  ctx.textBaseline = 'alphabetic';
+  buttons.push({ x, y, w, h, label, action: action || ('btn:' + label) });
+}
+
+function drawLevelCard(x, y, w, h, lvl) {
+  // Card body
+  ctx.fillStyle = '#1c2c40';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+
+  // Thumbnail area
+  const thW = w, thH = 100;
+  drawLevelThumbnail(x, y, thW, thH, lvl);
+
+  // Difficulty badge (top-right of thumbnail)
+  const dx = x + w - 56, dy = y + 8;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(dx, dy, 48, 22);
+  ctx.fillStyle = '#ffd84a';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('DIFF', dx + 6, dy + 14);
+  // Stars
+  for (let i = 0; i < 5; i++) {
+    ctx.fillStyle = i < lvl.diff ? '#ffd84a' : 'rgba(255,255,255,0.2)';
+    ctx.fillRect(dx + 6 + i * 7, dy + 17, 4, 2);
+  }
+
+  // Code chip (top-left)
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(x + 8, y + 8, 70, 20);
+  ctx.fillStyle = '#a8d4f0';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(lvl.code, x + 8 + 35, y + 22);
+
+  // Body text
+  const tx = x + 12;
+  let ty = y + thH + 22;
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'left';
+  // Truncate name if too long
+  const maxName = w - 24;
+  let nm = lvl.name;
+  ctx.font = 'bold 16px monospace';
+  while (ctx.measureText(nm).width > maxName && nm.length > 3) nm = nm.slice(0, -1);
+  if (nm !== lvl.name) nm = nm.slice(0, -1) + '…';
+  ctx.fillText(nm, tx, ty);
+
+  ty += 18;
+  ctx.fillStyle = 'rgba(168,212,240,0.7)';
+  ctx.font = '12px monospace';
+  ctx.fillText('by ' + lvl.author, tx, ty);
+
+  // Stats row
+  ty = y + h - 14;
+  ctx.fillStyle = '#00ff88';
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText(lvl.best != null ? '⏱ ' + lvl.best.toFixed(1) + 's' : '⏱ —', tx, ty);
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.textAlign = 'right';
+  const playStr = lvl.plays >= 1000 ? (lvl.plays / 1000).toFixed(1) + 'k' : String(lvl.plays);
+  ctx.fillText('▶ ' + playStr, x + w - 12, ty);
+  ctx.textAlign = 'left';
+
+  // Whole card is clickable
+  buttons.push({ x, y, w, h, label: 'level:' + lvl.code, action: 'level:' + lvl.code });
+}
+
+function drawLevelThumbnail(x, y, w, h, lvl) {
+  // Theme-tinted mini-map
+  const themes = {
+    hallway:    { bg: '#c8a870', accent: '#4a7fa5', detail: '#8b6f47' },
+    playground: { bg: '#5a8a4a', accent: '#d4a060', detail: '#3d6d8f' },
+    cafeteria:  { bg: '#dccba5', accent: '#8b5e3c', detail: '#c8703a' },
+    office:     { bg: '#7a6a8a', accent: '#5a3820', detail: '#3d5a4a' },
+    baseball:   { bg: '#6a9a5a', accent: '#b89060', detail: '#fff' },
+  };
+  const th = themes[lvl.theme] || themes.hallway;
+  ctx.fillStyle = th.bg;
+  ctx.fillRect(x, y, w, h);
+
+  // Tile pattern (very small)
+  ctx.fillStyle = 'rgba(0,0,0,0.08)';
+  for (let cx = 0; cx < w; cx += 16) {
+    for (let cy = 0; cy < h; cy += 16) {
+      if (((cx / 16) + (cy / 16)) % 2 === 0) ctx.fillRect(x + cx, y + cy, 16, 16);
+    }
+  }
+
+  // Theme-specific motif (simple shapes only)
+  ctx.save();
+  ctx.translate(x, y);
+  if (lvl.theme === 'hallway') {
+    // Two locker strips top and bottom
+    ctx.fillStyle = th.accent;
+    ctx.fillRect(0, 8, w, 14);
+    ctx.fillRect(0, h - 22, w, 14);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    for (let i = 0; i < w; i += 12) {
+      ctx.fillRect(i, 8, 1, 14);
+      ctx.fillRect(i, h - 22, 1, 14);
+    }
+  } else if (lvl.theme === 'playground') {
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(w / 2 - 30, h / 2 - 18, 60, 36);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(w / 2, h / 2, 8, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (lvl.theme === 'cafeteria') {
+    ctx.fillStyle = th.accent;
+    for (let r = 0; r < 3; r++) ctx.fillRect(20, 24 + r * 18, w - 40, 6);
+  } else if (lvl.theme === 'office') {
+    ctx.fillStyle = th.accent;
+    ctx.fillRect(w / 2 - 4, 10, 8, h - 20);
+    ctx.fillStyle = th.detail;
+    ctx.fillRect(10, 18, 24, 14);
+    ctx.fillRect(w - 34, 18, 24, 14);
+    ctx.fillRect(10, h - 32, 24, 14);
+    ctx.fillRect(w - 34, h - 32, 24, 14);
+  } else if (lvl.theme === 'baseball') {
+    ctx.fillStyle = th.accent;
+    ctx.beginPath();
+    ctx.arc(w / 2, h - 14, 32, Math.PI, 0);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(w / 2 - 1, h - 14, 2, 2);
+  }
+  ctx.restore();
+
+  // Jax dot + Chandler dot
+  ctx.fillStyle = '#4dabf7';
+  ctx.fillRect(x + 8, y + h - 12, 4, 4);
+  ctx.fillStyle = '#e03040';
+  ctx.fillRect(x + w - 12, y + 8, 5, 5);
+
+  // Scanline overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  for (let i = 0; i < h; i += 3) ctx.fillRect(x, y + i, w, 1);
+
+  // Featured ribbon
+  if (lvl.featured) {
+    ctx.fillStyle = '#ffd84a';
+    ctx.save();
+    ctx.translate(x + w - 4, y + h - 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(-72, -22, 72, 18);
+    ctx.fillStyle = '#ffd84a';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('★ FEATURED', -36, -9);
+    ctx.restore();
+  }
+}
+
+function drawLockerLobby(x, y, w, h) {
+  ctx.fillStyle = PAL.lockerA;
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = PAL.lockerTrim;
+  ctx.fillRect(x, y, 3, h);
+  ctx.fillStyle = PAL.lockerB;
+  ctx.fillRect(x + w - 4, y, 4, h);
+  ctx.fillRect(x, y + h - 4, w, 4);
+  ctx.fillStyle = PAL.lockerVent;
+  for (let i = 0; i < 3; i++) ctx.fillRect(x + 8, y + 14 + i * 8, w - 16, 2);
+  ctx.fillStyle = PAL.doorKnob;
+  ctx.fillRect(x + w - 14, y + h / 2 - 5, 6, 10);
+  ctx.strokeStyle = PAL.lockerVent;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + w / 2, y + 4);
+  ctx.lineTo(x + w / 2, y + h - 4);
+  ctx.stroke();
+}
+
+function drawLobbySprite(cx, cy, who, t) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(0, 60, 38, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (who === 'jax') {
+    ctx.scale(2.4, 2.4);
+    const cycle = (t * 6) % 2;
+    const frame = cycle < 1 ? 1 : 2;
+    drawJaxSprite(-16, -20, frame, 1);
+  } else {
+    ctx.scale(2.2, 2.2);
+    const cycle = (t * 5) % 2;
+    const frame = cycle < 1 ? 1 : 2;
+    drawChandlerSprite(-17, -23, frame, -1, false);
+  }
+  ctx.restore();
 }
 
 // ─────────────────────────────────────────────
 // EXIT COMPASS (off-screen arrow)
 // ─────────────────────────────────────────────
 function drawExitCompass() {
-  const ex = 3060 + 45, ey = 200 + 45;
+  const ex = exitPos.x + exitPos.w / 2, ey = exitPos.y + exitPos.h / 2;
   const jcx = jax.x + PLAYER_SIZE/2, jcy = jax.y + PLAYER_SIZE/2;
   const dx = ex - jcx, dy = ey - jcy;
   const angle = Math.atan2(dy, dx);
@@ -1692,19 +2420,54 @@ function drawParticles() {
 // LEVEL INIT
 // ─────────────────────────────────────────────
 function resetLevel() {
-  jax = { x: 160, y: 2100, w: PLAYER_SIZE, h: PLAYER_SIZE, vx: 0, vy: 0,
+  let jaxX = 160, jaxY = 2100;
+  let chanX = 160, chanY = 200;
+
+  if (currentMapData) {
+    const [pc, pr] = currentMapData.playerStart;
+    const [vc, vr] = currentMapData.villain;
+    const [ec, er] = currentMapData.exit;
+    jaxX  = pc * CELL + (CELL - PLAYER_SIZE)  / 2;
+    jaxY  = pr * CELL + (CELL - PLAYER_SIZE)  / 2;
+    chanX = vc * CELL + (CELL - CHANDLER_SIZE) / 2;
+    chanY = vr * CELL + (CELL - CHANDLER_SIZE) / 2;
+    const es = 90;
+    exitPos = { x: ec * CELL + (CELL - es) / 2, y: er * CELL + (CELL - es) / 2, w: es, h: es };
+  }
+
+  jax = { x: jaxX, y: jaxY, w: PLAYER_SIZE, h: PLAYER_SIZE, vx: 0, vy: 0,
           facing: 1, walkTime: 0, moving: false };
-  chandler = { x: 160, y: 200, w: CHANDLER_SIZE, h: CHANDLER_SIZE, vx: 0, vy: 0, stun: 0, facing: 1, walkTime: 0 };
+  chandler = { x: chanX, y: chanY, w: CHANDLER_SIZE, h: CHANDLER_SIZE, vx: 0, vy: 0, stun: 0, facing: 1, walkTime: 0 };
   levelTime = 0;
   activeBuffs = [];
   particles = [];
-  objects = [...buildWalls(), ...buildChairs(), ...buildPickups()];
+
+  if (currentMapData) {
+    objects = buildObjectsFromMap(currentMapData);
+    // Pickups from map specials
+    const pickupTypeMap = { gel: 'hair_gel', mirror: 'mirror', spray: 'hairspray' };
+    const psize = 22;
+    for (const [k, pos] of Object.entries(currentMapData.pickups || {})) {
+      if (!pos) continue;
+      const type = pickupTypeMap[k];
+      if (!type) continue;
+      objects.push({
+        x: pos[0] * CELL + (CELL - psize) / 2,
+        y: pos[1] * CELL + (CELL - psize) / 2,
+        w: psize, h: psize, kind: 'pickup', type,
+        pulse: Math.random() * Math.PI * 2,
+      });
+    }
+  } else {
+    objects = [...buildWalls(), ...buildChairs(), ...buildPickups()];
+  }
+
   gameState = 'playing';
   buttons = [];
   chandlerPath = [];
   pathTimer = 0;
   stuckTimer = 0;
-  stuckLastPos = { x: 160, y: 200 };
+  stuckLastPos = { x: chanX, y: chanY };
   navGrid = null;
   buildNavGrid();
   updateCamera();
@@ -1840,8 +2603,7 @@ function update(dt) {
   }
 
   // Exit check
-  const exitObj = { x: 3060, y: 200, w: 90, h: 90 };
-  if (overlaps(jaxObj, exitObj)) {
+  if (overlaps(jaxObj, exitPos)) {
     gameState = 'win';
   }
 
@@ -1860,8 +2622,22 @@ function update(dt) {
 // MAIN DRAW
 // ─────────────────────────────────────────────
 let t = 0;
-function draw() {
+function draw(dt) {
   ctx.clearRect(0, 0, VW, VH);
+
+  if (gameState === 'lobby') {
+    buttons = [];
+    canvas.classList.add('lobby');
+    drawLobby(t);
+    return;
+  } else if (gameState === 'level_select') {
+    buttons = [];
+    canvas.classList.add('lobby');
+    drawLevelSelect(t, dt);
+    return;
+  } else {
+    canvas.classList.remove('lobby');
+  }
 
   // Apply camera transform — everything drawn in world space
   ctx.save();
@@ -1879,6 +2655,11 @@ function draw() {
   ctx.restore();
 
   // HUD drawn in screen space (no camera offset)
+  if (gameState === 'lobby') {
+    // Lobby covers the whole screen — draw on top of (or instead of) the world
+    buttons = [];
+    drawLobby(t);
+  }
   if (gameState === 'playing') {
     drawHUD(t);
     drawExitCompass();
@@ -1903,7 +2684,7 @@ function loop(ts) {
   t += dt;
 
   update(dt);
-  draw();
+  draw(dt);
   requestAnimationFrame(loop);
 }
 
@@ -1912,6 +2693,7 @@ function loop(ts) {
 // ─────────────────────────────────────────────
 initPatterns();
 resetLevel();
+gameState = 'lobby';
 requestAnimationFrame(loop);
 </script>
 </body>

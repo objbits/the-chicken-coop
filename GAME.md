@@ -1,4 +1,4 @@
-# Chandler's World — Game Design & Technical Reference
+# The Chicken Coop — Game Design & Technical Reference
 
 ## Story
 Jax is a student trying to escape the school grounds before the villain **Chandler** catches him. Jax must navigate five different school locations and reach the exit in each one. Escape time is accumulated across all five levels. The player with the lowest cumulative time earns a spot on the leaderboard.
@@ -360,28 +360,75 @@ GAME LOOP          → loop() entry point
 
 ---
 
+## Level System
+
+Levels are no longer hardcoded — they are loaded from map-builder JSON files stored in `games/catalog.js`. The game supports two categories:
+
+| Category | Description |
+|----------|-------------|
+| `system` | Official levels authored by the CW Team; shipped in `games/catalog.js` |
+| `popular` | Community-submitted levels (stub entries until server support is added) |
+| `mine` | Levels created by the current user in the map builder |
+
+### Catalog Format (`games/catalog.js`)
+
+```javascript
+window.GAME_CATALOG = [
+  {
+    code:          'SCH001',       // 6-char unique code, typed to enter the level
+    name:          'School Hallway',
+    author:        'CW Team',
+    diff:          2,              // 1–5 difficulty
+    theme:         'hallway',      // background theme key for card art
+    cat:           'system',       // 'system' | 'popular' | 'mine'
+    chandlerSpeed: 75,             // px/s
+    map:           { ... },        // full map-builder v1 JSON
+  },
+];
+```
+
+The `map` field is the direct output of the map builder's Export JSON. `games/catalog.js` is loaded in `<head>` so `window.GAME_CATALOG` is available before the game script runs.
+
+### Map Importer
+
+`buildObjectsFromMap(mapData)` converts a map JSON into `objects[]` at level start:
+- Cell borders → deduplicated wall collision rectangles (14px thick)
+- `wall` object → full-cell wall
+- `mud` object → full-cell mud zone (0.4× speed)
+- `pushable` object → 44×44 pushable centered in cell
+- `locker` / `desk` / `blackboard` → 16px edge strip (rotation-aware, flush to the wall they face)
+- `door` → passable, no collision
+
+`drawMapFromCells(mapData)` renders the visual map:
+- Each cell filled with its background tile pattern
+- Border walls drawn using `drawWallSegment()` (same brick art as the hardcoded level)
+
+### Adding New Official Levels
+
+1. Build the level in the map builder and export JSON
+2. Add a builder function to `games/catalog.js` that returns the JSON
+3. Add an entry to `window.GAME_CATALOG`
+
+---
+
 ## Planned / Future Development
 
 ### Core Gameplay
-- [ ] Implement Pickups system (see Pickups section) — sprite art, placement, stun state
 - [ ] Secondary villain collision applies `speed_down` or `push` debuff
 - [ ] Additional buff types: shield, teleport
 - [ ] Multiple villains in later levels (additional Chandlers or new characters)
-- [ ] Inner wall layouts for Levels 2–5 (map design sessions)
-- [ ] Chandler pathfinding around walls (A* or steering behaviors)
+- [ ] Chandler pathfinding improvements (wall-hugging, stuck detection tuning)
 
 ### Objects & Environment
-- [ ] Dynamic object placement rules per level (density, zone constraints)
-- [ ] Destructible objects (walls that can be broken after enough pushes)
-- [ ] Moving obstacles (e.g., rolling ball that bounces)
+- [ ] Destructible objects (walls that break after enough pushes)
+- [ ] Moving obstacles (rolling ball that bounces between walls)
+
+### Level Catalog
+- [ ] Server-side catalog and leaderboard (replace `localStorage` + static catalog)
+- [ ] User level submission flow (map builder → server → community tab)
+- [ ] Level rating and plays count from server
 
 ### Polish
-- [ ] Sprite/pixel-art graphics for Jax and Chandler
-- [ ] Sound effects and background music per level theme
-- [ ] Animated exit portal
-- [ ] Level intro screen showing the map theme and Chandler speed warning
-
-### Platform
+- [ ] Sound effects and background music per theme
+- [ ] Level intro screen (theme art + Chandler speed warning)
 - [ ] Mobile/touch support (touch position replaces mouse)
-- [ ] Server-side leaderboard (replace `localStorage`)
-- [ ] Level select screen (unlocked after first full completion)
