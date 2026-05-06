@@ -1,0 +1,1918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chandler's World — Level 1</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0d1a; font-family: monospace; }
+  canvas { display: block; image-rendering: pixelated; cursor: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ─────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────
+const MAP_W = 3200, MAP_H = 2400;
+const PLAYER_SIZE = 28;
+const CHANDLER_SIZE = 34;
+const PLAYER_SPEED = 220;
+const CHANDLER_SPEED = 75;
+const WALL_THICK = 14;
+const PUSH_FORCE = 280;
+const PUSH_DRAG = 5;
+const TILE = 32;
+
+// ─────────────────────────────────────────────
+// CANVAS SETUP — viewport sized, camera follows Jax
+// ─────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let VW = window.innerWidth;
+let VH = window.innerHeight;
+
+function resize() {
+  VW = window.innerWidth;
+  VH = window.innerHeight;
+  canvas.width = VW;
+  canvas.height = VH;
+  canvas.style.width = VW + 'px';
+  canvas.style.height = VH + 'px';
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ─────────────────────────────────────────────
+// INPUT — mouse in WORLD coords (viewport + camera offset)
+// ─────────────────────────────────────────────
+let mouse = { x: 160, y: 2100 };
+canvas.addEventListener('mousemove', e => {
+  const r = canvas.getBoundingClientRect();
+  mouse.x = (e.clientX - r.left) + camera.x;
+  mouse.y = (e.clientY - r.top) + camera.y;
+});
+canvas.addEventListener('click', handleClick);
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let gameState = 'playing';
+let levelTime = 0;
+let jax = { x: 160, y: 2100, vx: 0, vy: 0, color: '#4dabf7', size: PLAYER_SIZE,
+            facing: 1, walkTime: 0, moving: false };
+let chandler = { x: 160, y: 200, vx: 0, vy: 0, color: '#e03040', size: CHANDLER_SIZE, stun: 0, facing: 1, walkTime: 0 };
+let camera = { x: 0, y: 0 };
+let buttons = [];
+let activeBuffs = [];
+let exitPulse = 0;
+let objects = [];
+let particles = [];
+
+// ─────────────────────────────────────────────
+// PALETTE — SNES School
+// ─────────────────────────────────────────────
+const PAL = {
+  floorLight:  '#d4b483',  // main hallway tile A
+  floorDark:   '#c8a870',  // main hallway tile B
+  classFloor:  '#e8d9b8',  // classroom floor (lighter linoleum)
+  classDark:   '#dccba5',
+  wallFace:    '#8b6f47',  // wall brick face
+  wallMortar:  '#6b5235',  // mortar / wall dark
+  wallTop:     '#a07848',  // wall top highlight
+  lockerA:     '#4a7fa5',  // locker blue
+  lockerB:     '#3d6d8f',  // locker shadow
+  lockerVent:  '#2a4f6a',  // locker vent stripe
+  lockerTrim:  '#7ab0cc',  // locker highlight
+  deskTop:     '#8b5e3c',  // wooden desk
+  deskSide:    '#6b4428',
+  deskLeg:     '#5a3820',
+  doorFace:    '#c8703a',  // door wood
+  doorFrame:   '#8b4a20',
+  doorKnob:    '#d4a020',
+  windowPane:  '#a8d4f0',
+  windowFrame: '#6b7a8b',
+  blackboard:  '#2a4a35',
+  chalkLine:   '#c8d8c0',
+  corridorShadow: 'rgba(0,0,0,0.18)',
+  exitGlow:    '#00ff88',
+  exitDark:    '#00aa55',
+  jaxColor:    '#4dabf7',
+  chandlerRed: '#e03040',
+};
+
+// ─────────────────────────────────────────────
+// TILE PATTERNS (offscreen canvas, cached)
+// ─────────────────────────────────────────────
+function makeHallTilePattern() {
+  const oc = document.createElement('canvas');
+  oc.width = TILE * 2; oc.height = TILE * 2;
+  const c = oc.getContext('2d');
+  // checkerboard of two close tan shades
+  c.fillStyle = PAL.floorLight; c.fillRect(0, 0, TILE*2, TILE*2);
+  c.fillStyle = PAL.floorDark;
+  c.fillRect(0, 0, TILE, TILE);
+  c.fillRect(TILE, TILE, TILE, TILE);
+  // grout lines
+  c.strokeStyle = PAL.wallMortar; c.lineWidth = 2; c.globalAlpha = 0.35;
+  c.strokeRect(1, 1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, 1, TILE-2, TILE-2);
+  c.strokeRect(1, TILE+1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, TILE+1, TILE-2, TILE-2);
+  c.globalAlpha = 1;
+  return ctx.createPattern(oc, 'repeat');
+}
+
+function makeClassTilePattern() {
+  const oc = document.createElement('canvas');
+  oc.width = TILE * 2; oc.height = TILE * 2;
+  const c = oc.getContext('2d');
+  c.fillStyle = PAL.classFloor; c.fillRect(0, 0, TILE*2, TILE*2);
+  c.fillStyle = PAL.classDark;
+  c.fillRect(0, 0, TILE, TILE);
+  c.fillRect(TILE, TILE, TILE, TILE);
+  c.strokeStyle = '#b8a882'; c.lineWidth = 1.5; c.globalAlpha = 0.3;
+  c.strokeRect(1, 1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, 1, TILE-2, TILE-2);
+  c.strokeRect(1, TILE+1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, TILE+1, TILE-2, TILE-2);
+  c.globalAlpha = 1;
+  return ctx.createPattern(oc, 'repeat');
+}
+
+let hallPattern, classPattern;
+function initPatterns() {
+  hallPattern = makeHallTilePattern();
+  classPattern = makeClassTilePattern();
+}
+
+// ─────────────────────────────────────────────
+// MAP GEOMETRY
+// ─────────────────────────────────────────────
+// Horizontal corridor runs at midY ± 180
+// Cross corridors at x = 500, 1100, 1700, 2300 (widths 140px each)
+// Classrooms fill above/below corridor
+
+const midY = MAP_H / 2;   // 1200
+const corrTop    = midY - 180;  // 1020
+const corrBot    = midY + 180;  // 1380
+const corrHeight = 360;
+
+// Gap positions (center x) for cross-corridors
+const CROSS_GAPS = [500, 1100, 1700, 2300];
+const GAP_W = 140;
+
+// Door width for classroom entrances
+const DOOR_W = 56;
+
+// Classrooms: 5 above, 5 below (between cross corridors + edges)
+// Each has a doorCX (center x of the door gap on the corridor wall)
+function makeClassZones() {
+  const boundaries = [
+    WALL_THICK,
+    CROSS_GAPS[0] - GAP_W/2,
+    CROSS_GAPS[0] + GAP_W/2,
+    CROSS_GAPS[1] - GAP_W/2,
+    CROSS_GAPS[1] + GAP_W/2,
+    CROSS_GAPS[2] - GAP_W/2,
+    CROSS_GAPS[2] + GAP_W/2,
+    CROSS_GAPS[3] - GAP_W/2,
+    CROSS_GAPS[3] + GAP_W/2,
+    MAP_W - WALL_THICK,
+  ];
+  const zones = [];
+  // 5 above, 5 below
+  for (let i = 0; i < 5; i++) {
+    const x1 = boundaries[i * 2];
+    const x2 = boundaries[i * 2 + 1];
+    const w = x2 - x1;
+    const doorCX = x1 + w / 2;
+    zones.push({ x: x1, y: WALL_THICK, w, h: corrTop - WALL_THICK, doorCX, above: true });
+  }
+  for (let i = 0; i < 5; i++) {
+    const x1 = boundaries[i * 2];
+    const x2 = boundaries[i * 2 + 1];
+    const w = x2 - x1;
+    const doorCX = x1 + w / 2;
+    zones.push({ x: x1, y: corrBot, w, h: MAP_H - WALL_THICK - corrBot, doorCX, above: false });
+  }
+  return zones;
+}
+const classZones = makeClassZones();
+
+// ─────────────────────────────────────────────
+// DRAW MAP — SNES style
+// ─────────────────────────────────────────────
+function drawMap() {
+  // 1. Fill entire map with outer wall (brick) colour
+  ctx.fillStyle = PAL.wallFace;
+  ctx.fillRect(0, 0, MAP_W, MAP_H);
+
+  // 2. Draw brick pattern for outer wall areas
+  drawBrickWalls();
+
+  // 3. Classroom floors
+  ctx.fillStyle = classPattern;
+  for (const z of classZones) {
+    ctx.fillRect(z.x, z.y, z.w, z.h);
+  }
+
+  // 4. Corridor floor (hallway)
+  // Full horizontal corridor band
+  ctx.fillStyle = hallPattern;
+  ctx.fillRect(WALL_THICK, corrTop, MAP_W - WALL_THICK*2, corrHeight);
+  // Cross corridors (vertical strips at gap positions)
+  for (const gx of CROSS_GAPS) {
+    ctx.fillRect(gx - GAP_W/2, WALL_THICK, GAP_W, MAP_H - WALL_THICK*2);
+  }
+
+  // 5. Corridor inner walls (dividing corridor from classrooms)
+  drawCorridorWalls();
+
+  // 6. Lockers along corridor edges
+  drawLockers();
+
+  // 7. Classroom interiors (desks, boards, doors)
+  drawClassrooms();
+
+  // 8. Outer border
+  ctx.fillStyle = PAL.wallMortar;
+  ctx.fillRect(0, 0, MAP_W, WALL_THICK);
+  ctx.fillRect(0, MAP_H - WALL_THICK, MAP_W, WALL_THICK);
+  ctx.fillRect(0, 0, WALL_THICK, MAP_H);
+  ctx.fillRect(MAP_W - WALL_THICK, 0, WALL_THICK, MAP_H);
+
+  // 9. Corridor ambient shadow
+  const shadowGrad = ctx.createLinearGradient(0, corrTop, 0, corrTop + 30);
+  shadowGrad.addColorStop(0, 'rgba(0,0,0,0.25)');
+  shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = shadowGrad;
+  ctx.fillRect(WALL_THICK, corrTop, MAP_W - WALL_THICK*2, 30);
+
+  const shadowGrad2 = ctx.createLinearGradient(0, corrBot - 30, 0, corrBot);
+  shadowGrad2.addColorStop(0, 'rgba(0,0,0,0)');
+  shadowGrad2.addColorStop(1, 'rgba(0,0,0,0.25)');
+  ctx.fillStyle = shadowGrad2;
+  ctx.fillRect(WALL_THICK, corrBot - 30, MAP_W - WALL_THICK*2, 30);
+}
+
+function drawBrickWalls() {
+  const bw = 48, bh = 20;
+  ctx.fillStyle = PAL.wallMortar;
+  // Draw mortar base over outer wall areas (outer border only shown in border sections)
+  // Bricks in the outer walls (top/bottom strips, left/right strips)
+  ctx.save();
+  ctx.fillStyle = PAL.wallFace;
+  // top strip
+  drawBrickStrip(WALL_THICK, WALL_THICK, MAP_W - WALL_THICK*2, corrTop - WALL_THICK, bw, bh);
+  // bottom strip
+  drawBrickStrip(WALL_THICK, corrBot, MAP_W - WALL_THICK*2, MAP_H - WALL_THICK - corrBot, bw, bh);
+  ctx.restore();
+}
+
+function drawBrickStrip(x, y, w, h, bw, bh) {
+  // This is already handled by classPattern — skip visual bricks in classroom zones
+  // We just draw the wall behind classrooms (the vertical strips between classrooms)
+  ctx.fillStyle = PAL.wallFace;
+  ctx.fillRect(x, y, w, h);
+
+  // horizontal mortar lines
+  ctx.strokeStyle = PAL.wallMortar;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.5;
+  for (let ry = y; ry < y + h; ry += bh) {
+    ctx.beginPath(); ctx.moveTo(x, ry); ctx.lineTo(x + w, ry); ctx.stroke();
+  }
+  // vertical mortar lines (offset every other row)
+  for (let ry = y, row = 0; ry < y + h; ry += bh, row++) {
+    const off = (row % 2 === 0) ? 0 : bw / 2;
+    for (let rx = x + off; rx < x + w; rx += bw) {
+      ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx, Math.min(ry + bh, y + h)); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawCorridorWalls() {
+  const wallH = 16;
+  const topY = corrTop - wallH;
+  const botY = corrBot;
+
+  const topDoorCXs = classZones.filter(z => z.above).map(z => z.doorCX);
+  const botDoorCXs = classZones.filter(z => !z.above).map(z => z.doorCX);
+
+  const segments = getWallSegments(WALL_THICK, MAP_W - WALL_THICK, CROSS_GAPS, GAP_W);
+
+  for (const seg of segments) {
+    // Draw top wall with door gaps
+    const topDoors = topDoorCXs.filter(cx => cx > seg.x1 && cx < seg.x2);
+    const topSegs = segmentsWithDoors(seg.x1, seg.x2, topDoors);
+    for (const s of topSegs) drawWallSegment(s.x1, topY, s.x2 - s.x1, wallH);
+    // Draw door openings (floor-coloured gap + door art)
+    for (const cx of topDoors) drawDoorInWall(cx - DOOR_W/2, topY, DOOR_W, wallH, true);
+
+    // Draw bottom wall with door gaps
+    const botDoors = botDoorCXs.filter(cx => cx > seg.x1 && cx < seg.x2);
+    const botSegs = segmentsWithDoors(seg.x1, seg.x2, botDoors);
+    for (const s of botSegs) drawWallSegment(s.x1, botY, s.x2 - s.x1, wallH);
+    for (const cx of botDoors) drawDoorInWall(cx - DOOR_W/2, botY, DOOR_W, wallH, false);
+  }
+
+  // Cross corridor side walls
+  for (const gx of CROSS_GAPS) {
+    const lx = gx - GAP_W / 2 - wallH;
+    const rx = gx + GAP_W / 2;
+    drawWallSegment(lx, WALL_THICK, wallH, corrTop - WALL_THICK);
+    drawWallSegment(rx, WALL_THICK, wallH, corrTop - WALL_THICK);
+    drawWallSegment(lx, corrBot + wallH, wallH, MAP_H - WALL_THICK - corrBot - wallH);
+    drawWallSegment(rx, corrBot + wallH, wallH, MAP_H - WALL_THICK - corrBot - wallH);
+  }
+}
+
+// Return horizontal sub-segments with door gaps removed
+function segmentsWithDoors(x1, x2, doorCXs) {
+  const gaps = doorCXs.map(cx => ({ start: cx - DOOR_W/2, end: cx + DOOR_W/2 }));
+  gaps.sort((a, b) => a.start - b.start);
+  const segs = [];
+  let cur = x1;
+  for (const gap of gaps) {
+    if (cur < gap.start) segs.push({ x1: cur, x2: gap.start });
+    cur = gap.end;
+  }
+  if (cur < x2) segs.push({ x1: cur, x2 });
+  return segs;
+}
+
+function drawDoorInWall(x, y, w, h, facingDown) {
+  // Fill gap with corridor floor colour so it looks like an open doorway
+  ctx.fillStyle = hallPattern;
+  ctx.fillRect(x, y, w, h);
+  // Door frame sides
+  ctx.fillStyle = PAL.doorFrame;
+  ctx.fillRect(x, y, 4, h);
+  ctx.fillRect(x + w - 4, y, 4, h);
+  // Top/bottom lintel
+  ctx.fillStyle = PAL.doorFrame;
+  if (facingDown) {
+    ctx.fillRect(x, y, w, 3); // lintel at top
+  } else {
+    ctx.fillRect(x, y + h - 3, w, 3); // lintel at bottom
+  }
+}
+
+function getWallSegments(startX, endX, gaps, gapW) {
+  const segs = [];
+  let cur = startX;
+  // sort gaps
+  const sorted = [...gaps].sort((a, b) => a - b);
+  for (const gx of sorted) {
+    const gStart = gx - gapW / 2;
+    const gEnd   = gx + gapW / 2;
+    if (cur < gStart) segs.push({ x1: cur, x2: gStart });
+    cur = gEnd;
+  }
+  if (cur < endX) segs.push({ x1: cur, x2: endX });
+  return segs;
+}
+
+function drawWallSegment(x, y, w, h) {
+  // Main wall face
+  ctx.fillStyle = PAL.wallFace;
+  ctx.fillRect(x, y, w, h);
+  // Top highlight
+  ctx.fillStyle = PAL.wallTop;
+  ctx.fillRect(x, y, w, 4);
+  // Bottom shadow
+  ctx.fillStyle = PAL.wallMortar;
+  ctx.fillRect(x, y + h - 4, w, 4);
+  // Left edge
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(x, y, 2, h);
+  // Pixel notch pattern
+  ctx.fillStyle = PAL.wallMortar;
+  ctx.globalAlpha = 0.4;
+  for (let px = x + 8; px < x + w - 4; px += 16) {
+    ctx.fillRect(px, y + 4, 2, h - 8);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawLockers() {
+  const lw = 28, lh = 56;
+  const lockerY_top = corrTop - 16 - lh;    // lockers along top wall (facing corridor, below wall)
+  const lockerY_bot = corrBot + 16;           // lockers along bottom wall (above wall)
+
+  // Draw lockers above corridor (bottom face of top wall)
+  for (let lx = WALL_THICK + 20; lx < MAP_W - WALL_THICK - lw; lx += lw + 4) {
+    // Skip gap zones
+    let inGap = false;
+    for (const gx of CROSS_GAPS) {
+      if (lx > gx - GAP_W/2 - lw - 10 && lx < gx + GAP_W/2 + 10) { inGap = true; break; }
+    }
+    if (inGap) continue;
+    drawLocker(lx, lockerY_top, lw, lh);
+  }
+
+  // Draw lockers below corridor (top face of bottom wall)
+  for (let lx = WALL_THICK + 20; lx < MAP_W - WALL_THICK - lw; lx += lw + 4) {
+    let inGap = false;
+    for (const gx of CROSS_GAPS) {
+      if (lx > gx - GAP_W/2 - lw - 10 && lx < gx + GAP_W/2 + 10) { inGap = true; break; }
+    }
+    if (inGap) continue;
+    drawLocker(lx, lockerY_bot, lw, lh);
+  }
+}
+
+function drawLocker(x, y, w, h) {
+  // body
+  ctx.fillStyle = PAL.lockerA;
+  ctx.fillRect(x, y, w, h);
+  // left highlight
+  ctx.fillStyle = PAL.lockerTrim;
+  ctx.fillRect(x, y, 3, h);
+  // right shadow
+  ctx.fillStyle = PAL.lockerB;
+  ctx.fillRect(x + w - 4, y, 4, h);
+  // bottom shadow
+  ctx.fillRect(x, y + h - 4, w, 4);
+  // vent slots (3 horizontal lines near top)
+  ctx.fillStyle = PAL.lockerVent;
+  for (let i = 0; i < 3; i++) {
+    ctx.fillRect(x + 4, y + 8 + i * 6, w - 8, 2);
+  }
+  // handle (small knob)
+  ctx.fillStyle = PAL.doorKnob;
+  ctx.fillRect(x + w - 8, y + h/2 - 4, 4, 8);
+  // frame divider line
+  ctx.strokeStyle = PAL.lockerVent;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + 2, y + h/2);
+  ctx.lineTo(x + w - 2, y + h/2);
+  ctx.stroke();
+}
+
+function drawClassrooms() {
+  for (let i = 0; i < classZones.length; i++) {
+    drawClassroom(classZones[i], i);
+  }
+}
+
+function drawClassroom(z, idx) {
+  const isAbove = z.above;
+
+  // Blackboard
+  const bbW = Math.min(z.w - 60, 280);
+  const bbH = 60;
+  const bbX = z.x + (z.w - bbW) / 2;
+  const bbY = isAbove ? z.y + 20 : z.y + z.h - 20 - bbH;
+  ctx.fillStyle = PAL.blackboard;
+  ctx.fillRect(bbX, bbY, bbW, bbH);
+  ctx.strokeStyle = PAL.deskSide;
+  ctx.lineWidth = 4;
+  ctx.strokeRect(bbX, bbY, bbW, bbH);
+  ctx.strokeStyle = PAL.chalkLine;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.7;
+  const seed = idx * 137;
+  for (let l = 0; l < 3; l++) {
+    const ly = bbY + 15 + l * 14;
+    ctx.beginPath();
+    ctx.moveTo(bbX + 10, ly);
+    ctx.lineTo(bbX + 10 + 30 + ((seed + l * 47) % 80), ly);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Desks
+  const deskW = 44, deskH = 32;
+  const colCount = Math.min(3, Math.floor((z.w - 80) / (deskW + 24)));
+  const startX = z.x + 40;
+  const midZoneY = z.y + z.h / 2;
+  const rowSpacing = 64;
+  const deskRowY = isAbove
+    ? [midZoneY - rowSpacing, midZoneY]
+    : [midZoneY - rowSpacing/2, midZoneY + rowSpacing/2];
+
+  for (const ry of deskRowY) {
+    for (let col = 0; col < colCount; col++) {
+      const dx = startX + col * (deskW + 28);
+      drawDesk(dx, ry - deskH/2, deskW, deskH);
+    }
+  }
+
+  // Door — drawn at the actual gap in the corridor wall
+  const doorW = DOOR_W;
+  const doorH = 14;
+  const doorX = z.doorCX - doorW / 2;
+  const doorY = isAbove ? z.y + z.h - doorH : z.y;
+  // door frame
+  ctx.fillStyle = PAL.doorFrame;
+  ctx.fillRect(doorX - 4, doorY, doorW + 8, doorH + 4);
+  // door face
+  ctx.fillStyle = PAL.doorFace;
+  ctx.fillRect(doorX, doorY, doorW, doorH);
+  // door knob
+  ctx.fillStyle = PAL.doorKnob;
+  ctx.beginPath();
+  ctx.arc(doorX + doorW - 8, doorY + doorH / 2, 4, 0, Math.PI * 2);
+  ctx.fill();
+  // window in door
+  ctx.fillStyle = PAL.windowPane;
+  ctx.fillRect(doorX + 6, doorY + 2, 14, doorH - 4);
+  ctx.strokeStyle = PAL.windowFrame;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(doorX + 6, doorY + 2, 14, doorH - 4);
+}
+
+function drawDesk(x, y, w, h) {
+  // desk top
+  ctx.fillStyle = PAL.deskTop;
+  ctx.fillRect(x, y, w, h);
+  // highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.fillRect(x + 2, y + 2, w - 4, 4);
+  // shadow edge
+  ctx.fillStyle = PAL.deskSide;
+  ctx.fillRect(x, y + h - 4, w, 4);
+  ctx.fillRect(x + w - 4, y, 4, h);
+  // legs
+  ctx.fillStyle = PAL.deskLeg;
+  ctx.fillRect(x + 3, y + h, 5, 8);
+  ctx.fillRect(x + w - 8, y + h, 5, 8);
+}
+
+// ─────────────────────────────────────────────
+// WALL COLLISION OBJECTS
+// ─────────────────────────────────────────────
+// Helper: push wall segments along a horizontal span, skipping a door gap
+function pushHorizWallWithDoors(walls, x1, x2, y, h, doorCXs) {
+  // Build list of door gaps
+  const gaps = doorCXs.map(cx => ({ start: cx - DOOR_W/2, end: cx + DOOR_W/2 }));
+  gaps.sort((a, b) => a.start - b.start);
+  let cur = x1;
+  for (const gap of gaps) {
+    if (cur < gap.start) {
+      walls.push({ x: cur, y, w: gap.start - cur, h, kind: 'wall', visible: true });
+    }
+    cur = gap.end;
+  }
+  if (cur < x2) {
+    walls.push({ x: cur, y, w: x2 - cur, h, kind: 'wall', visible: true });
+  }
+}
+
+// Helper: push wall segments along a vertical span, skipping a door gap
+function pushVertWallWithDoor(walls, x, y1, y2, w, doorCY) {
+  const gapStart = doorCY - DOOR_W/2;
+  const gapEnd   = doorCY + DOOR_W/2;
+  if (y1 < gapStart) walls.push({ x, y: y1, w, h: gapStart - y1, kind: 'wall', visible: true });
+  if (gapEnd < y2)   walls.push({ x, y: gapEnd, w, h: y2 - gapEnd, kind: 'wall', visible: true });
+}
+
+function buildWalls() {
+  const walls = [];
+  const wallH = 16;
+
+  // Outer border walls (invisible)
+  walls.push({ x: 0, y: 0, w: MAP_W, h: WALL_THICK, kind: 'wall', visible: false });
+  walls.push({ x: 0, y: MAP_H - WALL_THICK, w: MAP_W, h: WALL_THICK, kind: 'wall', visible: false });
+  walls.push({ x: 0, y: 0, w: WALL_THICK, h: MAP_H, kind: 'wall', visible: false });
+  walls.push({ x: MAP_W - WALL_THICK, y: 0, w: WALL_THICK, h: MAP_H, kind: 'wall', visible: false });
+
+  // Corridor top wall — broken by cross-corridor gaps AND classroom doors
+  const topY = corrTop - wallH;
+  const botY = corrBot;
+
+  // Collect door centers for above-corridor classrooms (they face bottom of their room = topY wall)
+  const topDoorCXs = classZones.filter(z => z.above).map(z => z.doorCX);
+  // Collect door centers for below-corridor classrooms (they face top of their room = botY wall)
+  const botDoorCXs = classZones.filter(z => !z.above).map(z => z.doorCX);
+
+  // For each corridor-wall segment (between cross-corridor gaps), punch door gaps
+  const corrSegs = getWallSegments(WALL_THICK, MAP_W - WALL_THICK, CROSS_GAPS, GAP_W);
+  for (const seg of corrSegs) {
+    // Top wall: doors for above-classrooms whose doorCX falls in this segment
+    const topDoors = topDoorCXs.filter(cx => cx > seg.x1 && cx < seg.x2);
+    pushHorizWallWithDoors(walls, seg.x1, seg.x2, topY, wallH, topDoors);
+    // Bottom wall: doors for below-classrooms
+    const botDoors = botDoorCXs.filter(cx => cx > seg.x1 && cx < seg.x2);
+    pushHorizWallWithDoors(walls, seg.x1, seg.x2, botY, wallH, botDoors);
+  }
+
+  // Cross-corridor side walls — vertical walls between classrooms and cross-corridors
+  // Each cross-corridor at gx has two faces: left wall (rooms to left face right) and right wall (rooms to right face left)
+  // We need doors where classroom zones border the cross-corridor
+  for (let g = 0; g < CROSS_GAPS.length; g++) {
+    const gx = CROSS_GAPS[g];
+    const lx = gx - GAP_W / 2 - wallH; // left side vertical wall x
+    const rx = gx + GAP_W / 2;          // right side vertical wall x
+
+    // For above section: classroom to the left of this gap has its right edge here
+    // classroom to the right of this gap has its left edge here
+    // They enter/exit via corridor (horizontal walls already have doors)
+    // The vertical side walls only need doors if classrooms span the full height and need
+    // side-exits — for this layout, classrooms only exit via corridor, so no side doors needed.
+    // Just build solid vertical dividers.
+    walls.push({ x: lx, y: WALL_THICK,       w: wallH, h: corrTop - WALL_THICK - wallH, kind: 'wall', visible: true });
+    walls.push({ x: rx, y: WALL_THICK,        w: wallH, h: corrTop - WALL_THICK - wallH, kind: 'wall', visible: true });
+    walls.push({ x: lx, y: corrBot + wallH,   w: wallH, h: MAP_H - WALL_THICK - corrBot - wallH, kind: 'wall', visible: true });
+    walls.push({ x: rx, y: corrBot + wallH,   w: wallH, h: MAP_H - WALL_THICK - corrBot - wallH, kind: 'wall', visible: true });
+  }
+
+  return walls;
+}
+
+// ─────────────────────────────────────────────
+// CHAIRS (pushable)
+// ─────────────────────────────────────────────
+function buildChairs() {
+  const chairs = [];
+  const csize = 22;
+
+  // Classrooms: place near desks
+  for (let i = 0; i < classZones.length; i++) {
+    const z = classZones[i];
+    const isAbove = z.y < corrTop;
+    const count = 2 + (i % 2); // 2–3 chairs per classroom
+    for (let c = 0; c < count; c++) {
+      const cx = z.x + 50 + c * 80 + (i * 30 % 40);
+      const cy = isAbove ? z.y + z.h * 0.55 + (c % 2) * 30 : z.y + z.h * 0.35 + (c % 2) * 30;
+      if (cx + csize < z.x + z.w - 10) {
+        chairs.push({ x: cx, y: cy, w: csize, h: csize, kind: 'pushable', vx: 0, vy: 0, type: 'chair' });
+      }
+    }
+  }
+
+  // A few chairs blocking corridor gaps (strategic choke points)
+  const chokeGaps = [CROSS_GAPS[1], CROSS_GAPS[2]];
+  for (const gx of chokeGaps) {
+    chairs.push({ x: gx - 11, y: corrTop + 30, w: csize, h: csize, kind: 'pushable', vx: 0, vy: 0, type: 'chair' });
+    chairs.push({ x: gx - 11, y: corrBot - 52, w: csize, h: csize, kind: 'pushable', vx: 0, vy: 0, type: 'chair' });
+  }
+
+  return chairs;
+}
+
+// ─────────────────────────────────────────────
+// PICKUPS
+// ─────────────────────────────────────────────
+const PICKUP_DEFS = {
+  'hair_gel':  { color: '#f0d020', label: 'GEL',    effect: 'speed_up',   duration: 5 },
+  'mirror':    { color: '#c0d8e8', label: 'MIRROR',  effect: 'stun',       duration: 2 },
+  'hairspray': { color: '#c0c0c0', label: 'SPRAY',   effect: 'push',       duration: 2 },
+};
+
+function tooClose(x, y, size, cx, cy, radius) {
+  const dx = x + size/2 - cx, dy = y + size/2 - cy;
+  return Math.sqrt(dx*dx + dy*dy) < radius;
+}
+
+function buildPickups() {
+  const pickups = [];
+  const psize = 22;
+  const candidates = [
+    { x: 800,  y: corrTop + 80, type: 'hair_gel' },
+    { x: 1500, y: corrTop + 100, type: 'mirror' },
+    { x: 2100, y: corrBot - 100, type: 'hairspray' },
+    { x: 400,  y: corrTop - 200, type: 'hair_gel' },
+    { x: 2700, y: corrBot + 150, type: 'hairspray' },
+  ];
+  for (const p of candidates) {
+    if (!tooClose(p.x, p.y, psize, 160, 2100, 140) &&
+        !tooClose(p.x, p.y, psize, 3060, 200, 90) &&
+        !tooClose(p.x, p.y, psize, 160, 200, 200)) {
+      pickups.push({ x: p.x, y: p.y, w: psize, h: psize, kind: 'pickup', type: p.type, pulse: Math.random() * Math.PI * 2 });
+    }
+  }
+  return pickups;
+}
+
+// ─────────────────────────────────────────────
+// COLLISION
+// ─────────────────────────────────────────────
+function overlaps(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x &&
+         a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function resolveAABB(entity, block) {
+  const ex = entity.x + entity.w/2, ey = entity.y + entity.h/2;
+  const bx = block.x + block.w/2, by = block.y + block.h/2;
+  const ox = (entity.w/2 + block.w/2) - Math.abs(ex - bx);
+  const oy = (entity.h/2 + block.h/2) - Math.abs(ey - by);
+  if (ox < oy) {
+    entity.x += ex < bx ? -ox : ox;
+  } else {
+    entity.y += ey < by ? -oy : oy;
+  }
+}
+
+function resolveSolids(entity, solids, isPushable, pushForce) {
+  for (let pass = 0; pass < 3; pass++) {
+    for (const s of solids) {
+      if (s === entity) continue;
+      if (!overlaps(entity, s)) continue;
+      if (isPushable && s.kind === 'pushable') {
+        // Push the object
+        const ex = entity.x + entity.w/2, ey = entity.y + entity.h/2;
+        const sx = s.x + s.w/2, sy = s.y + s.h/2;
+        const dx = sx - ex, dy = sy - ey;
+        const len = Math.sqrt(dx*dx + dy*dy) || 1;
+        s.vx = (dx / len) * pushForce;
+        s.vy = (dy / len) * pushForce;
+      }
+      resolveAABB(entity, s);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// A* PATHFINDING FOR CHANDLER
+// ─────────────────────────────────────────────
+const NAV_CELL = 20;  // finer grid — door gaps (56px) = ~2.8 cells wide, clearly passable
+const NAV_COLS = Math.ceil(MAP_W / NAV_CELL);
+const NAV_ROWS = Math.ceil(MAP_H / NAV_CELL);
+
+let navGrid = null;       // Uint8Array: 0=open, 1=blocked
+let chandlerPath = [];    // array of {x,y} world-center waypoints
+let pathTimer = 0;        // countdown to next replan
+const PATH_INTERVAL = 0.3; // replan every 0.3s
+let stuckTimer = 0;       // detect when Chandler hasn't moved
+let stuckLastPos = {x:0, y:0};
+
+function buildNavGrid() {
+  navGrid = new Uint8Array(NAV_COLS * NAV_ROWS);
+  const wallObjs = objects.filter(o => o.kind === 'wall');
+  for (const w of wallObjs) {
+    // Use a small margin — just enough to keep Chandler's center clear of walls
+    // but small enough not to block door gaps (56px wide)
+    const margin = 4;
+    const cx1 = Math.max(0, Math.floor((w.x - margin) / NAV_CELL));
+    const cy1 = Math.max(0, Math.floor((w.y - margin) / NAV_CELL));
+    const cx2 = Math.min(NAV_COLS - 1, Math.ceil((w.x + w.w + margin) / NAV_CELL));
+    const cy2 = Math.min(NAV_ROWS - 1, Math.ceil((w.y + w.h + margin) / NAV_CELL));
+    for (let gy = cy1; gy <= cy2; gy++) {
+      for (let gx = cx1; gx <= cx2; gx++) {
+        navGrid[gy * NAV_COLS + gx] = 1;
+      }
+    }
+  }
+}
+
+function worldToGrid(wx, wy) {
+  return {
+    gx: Math.max(0, Math.min(NAV_COLS - 1, Math.floor(wx / NAV_CELL))),
+    gy: Math.max(0, Math.min(NAV_ROWS - 1, Math.floor(wy / NAV_CELL)))
+  };
+}
+
+function gridToWorld(gx, gy) {
+  return { x: gx * NAV_CELL + NAV_CELL / 2, y: gy * NAV_CELL + NAV_CELL / 2 };
+}
+
+function heuristic(ax, ay, bx, by) {
+  // Octile distance (handles diagonals)
+  const dx = Math.abs(ax - bx), dy = Math.abs(ay - by);
+  return (dx + dy) + (Math.SQRT2 - 2) * Math.min(dx, dy);
+}
+
+function astar(startGX, startGY, goalGX, goalGY) {
+  if (!navGrid) return [];
+  // Fast A* with binary-heap-like sorted open set (using array + sort for simplicity)
+  const key = (gx, gy) => gy * NAV_COLS + gx;
+  const gScore = new Float32Array(NAV_COLS * NAV_ROWS).fill(Infinity);
+  const fScore = new Float32Array(NAV_COLS * NAV_ROWS).fill(Infinity);
+  const cameFrom = new Int32Array(NAV_COLS * NAV_ROWS).fill(-1);
+  const inOpen = new Uint8Array(NAV_COLS * NAV_ROWS);
+
+  const sk = key(startGX, startGY);
+  gScore[sk] = 0;
+  fScore[sk] = heuristic(startGX, startGY, goalGX, goalGY);
+  inOpen[sk] = 1;
+
+  // Open set as sorted array of {gx,gy,f}
+  const open = [{ gx: startGX, gy: startGY, f: fScore[sk] }];
+
+  const DIRS = [
+    [-1,0],[1,0],[0,-1],[0,1],
+    [-1,-1],[1,-1],[-1,1],[1,1]
+  ];
+  const COSTS = [1,1,1,1, Math.SQRT2, Math.SQRT2, Math.SQRT2, Math.SQRT2];
+
+  let iterations = 0;
+  while (open.length > 0 && iterations++ < 12000) {
+    // Pop lowest f
+    open.sort((a,b) => a.f - b.f);
+    const cur = open.shift();
+    const { gx, gy } = cur;
+    inOpen[key(gx,gy)] = 0;
+
+    if (gx === goalGX && gy === goalGY) {
+      // Reconstruct path
+      const path = [];
+      let ck = key(gx, gy);
+      while (ck !== sk) {
+        const cgx = ck % NAV_COLS, cgy = Math.floor(ck / NAV_COLS);
+        path.unshift(gridToWorld(cgx, cgy));
+        ck = cameFrom[ck];
+        if (ck < 0) break;
+      }
+      return path;
+    }
+
+    for (let d = 0; d < DIRS.length; d++) {
+      const nx = gx + DIRS[d][0], ny = gy + DIRS[d][1];
+      if (nx < 0 || nx >= NAV_COLS || ny < 0 || ny >= NAV_ROWS) continue;
+      const nk = key(nx, ny);
+      if (navGrid[nk]) continue; // blocked
+
+      // For diagonals, check both cardinal neighbors to avoid corner-cutting
+      if (d >= 4) {
+        const ak = key(gx + DIRS[d][0], gy);
+        const bk = key(gx, gy + DIRS[d][1]);
+        if (navGrid[ak] || navGrid[bk]) continue;
+      }
+
+      const tentG = gScore[key(gx,gy)] + COSTS[d];
+      if (tentG < gScore[nk]) {
+        cameFrom[nk] = key(gx, gy);
+        gScore[nk] = tentG;
+        fScore[nk] = tentG + heuristic(nx, ny, goalGX, goalGY);
+        if (!inOpen[nk]) {
+          inOpen[nk] = 1;
+          open.push({ gx: nx, gy: ny, f: fScore[nk] });
+        }
+      }
+    }
+  }
+  return []; // no path found
+}
+
+function replanChandlerPath() {
+  if (!navGrid) buildNavGrid();
+  const cs = worldToGrid(chandler.x + CHANDLER_SIZE/2, chandler.y + CHANDLER_SIZE/2);
+  const js = worldToGrid(jax.x + PLAYER_SIZE/2, jax.y + PLAYER_SIZE/2);
+
+  // If goal cell is blocked (Jax near a wall), try neighbors
+  let goalGX = js.gx, goalGY = js.gy;
+  if (navGrid[goalGY * NAV_COLS + goalGX]) {
+    for (const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const nx = js.gx+dx, ny = js.gy+dy;
+      if (nx>=0 && nx<NAV_COLS && ny>=0 && ny<NAV_ROWS && !navGrid[ny*NAV_COLS+nx]) {
+        goalGX = nx; goalGY = ny; break;
+      }
+    }
+  }
+
+  chandlerPath = astar(cs.gx, cs.gy, goalGX, goalGY);
+}
+
+function updateChandlerPath(dt) {
+  // Prune waypoints we've reached
+  while (chandlerPath.length > 0) {
+    const wp = chandlerPath[0];
+    const cx = chandler.x + CHANDLER_SIZE/2, cy = chandler.y + CHANDLER_SIZE/2;
+    const dist = Math.sqrt((wp.x-cx)**2 + (wp.y-cy)**2);
+    if (dist < NAV_CELL * 1.2) {
+      chandlerPath.shift();
+    } else break;
+  }
+
+  // Replan periodically or if path exhausted
+  pathTimer -= dt;
+  if (pathTimer <= 0 || chandlerPath.length === 0) {
+    replanChandlerPath();
+    pathTimer = PATH_INTERVAL;
+  }
+
+  // Stuck detection — if Chandler hasn't moved much, replan immediately
+  stuckTimer += dt;
+  if (stuckTimer > 0.8) {
+    const dx = chandler.x - stuckLastPos.x, dy = chandler.y - stuckLastPos.y;
+    if (Math.sqrt(dx*dx+dy*dy) < 8) {
+      replanChandlerPath();
+      pathTimer = PATH_INTERVAL;
+    }
+    stuckLastPos = { x: chandler.x, y: chandler.y };
+    stuckTimer = 0;
+  }
+
+  // Steer toward next waypoint (or direct to Jax if path empty)
+  const cx = chandler.x + CHANDLER_SIZE/2, cy = chandler.y + CHANDLER_SIZE/2;
+  let targetX, targetY;
+  if (chandlerPath.length > 0) {
+    targetX = chandlerPath[0].x;
+    targetY = chandlerPath[0].y;
+  } else {
+    // Fallback: direct chase
+    targetX = jax.x + PLAYER_SIZE/2;
+    targetY = jax.y + PLAYER_SIZE/2;
+  }
+
+  const tdx = targetX - cx, tdy = targetY - cy;
+  const tdist = Math.sqrt(tdx*tdx + tdy*tdy) || 1;
+  chandler.x += (tdx / tdist) * CHANDLER_SPEED * dt;
+  chandler.y += (tdy / tdist) * CHANDLER_SPEED * dt;
+  if (tdist > 4) {
+    chandler.walkTime += dt;
+    chandler.facing = tdx > 0 ? 1 : -1;
+  }
+}
+
+function updateCamera() {
+  const targetX = jax.x + PLAYER_SIZE / 2 - VW / 2;
+  const targetY = jax.y + PLAYER_SIZE / 2 - VH / 2;
+  camera.x = Math.max(0, Math.min(MAP_W - VW, targetX));
+  camera.y = Math.max(0, Math.min(MAP_H - VH, targetY));
+}
+
+// ─────────────────────────────────────────────
+// BUFF SYSTEM
+// ─────────────────────────────────────────────
+function applyBuff(type, params) {
+  activeBuffs = activeBuffs.filter(b => b.type !== type);
+  const defs = { speed_up: 5, speed_down: 5, push: 2 };
+  activeBuffs.push({ type, duration: defs[type] || 5, remaining: defs[type] || 5, params: params || {} });
+}
+
+function tickBuffs(dt) {
+  activeBuffs = activeBuffs.filter(b => { b.remaining -= dt; return b.remaining > 0; });
+}
+
+function buffSpeedMult() {
+  let mult = 1;
+  for (const b of activeBuffs) {
+    if (b.type === 'speed_up')   mult *= 1.8;
+    if (b.type === 'speed_down') mult *= 0.4;
+  }
+  return mult;
+}
+
+function buffPushVec() {
+  for (const b of activeBuffs) {
+    if (b.type === 'push') {
+      const t = b.remaining / b.duration;
+      return { vx: (b.params.vx || 0) * t, vy: (b.params.vy || 0) * t };
+    }
+  }
+  return { vx: 0, vy: 0 };
+}
+
+// ─────────────────────────────────────────────
+// ENTITY DRAW
+// ─────────────────────────────────────────────
+function drawExit(t) {
+  const ex = 3060, ey = 200, es = 90;
+  const glow = 8 + Math.sin(t * 3) * 6;
+  ctx.save();
+  ctx.shadowColor = PAL.exitGlow;
+  ctx.shadowBlur = glow;
+  // pulsing scale
+  const scale = 1 + Math.sin(t * 3) * 0.04;
+  ctx.translate(ex + es/2, ey + es/2);
+  ctx.scale(scale, scale);
+  ctx.translate(-(es/2), -(es/2));
+  // checkerboard exit pattern
+  const csize = 18;
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      ctx.fillStyle = (r + c) % 2 === 0 ? PAL.exitGlow : PAL.exitDark;
+      ctx.fillRect(c * csize, r * csize, csize, csize);
+    }
+  }
+  // border
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(0, 0, es, es);
+  // label
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('EXIT', es/2, es/2 + 6);
+  ctx.restore();
+}
+
+function drawSpawnMarker(x, y, label, color) {
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = color;
+  ctx.fillRect(x - 20, y - 20, 40, 40);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 4]);
+  ctx.strokeRect(x - 20, y - 20, 40, 40);
+  ctx.setLineDash([]);
+  ctx.fillStyle = color;
+  ctx.font = 'bold 12px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x, y - 26);
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────
+// JAX PIXEL ART SPRITE — 32×40, blonde, red polo, light skin
+// ─────────────────────────────────────────────
+// Colour palette for Jax
+const JAX_PAL = {
+  skin:      '#f5c9a0',
+  skinShad:  '#d4956a',
+  hairA:     '#e8c840',  // blonde bright
+  hairB:     '#c8a020',  // blonde shadow
+  hairC:     '#f0dc60',  // blonde highlight
+  polo:      '#cc2020',  // red polo
+  poloShad:  '#8b1010',  // polo shadow
+  poloHi:    '#e84040',  // polo highlight
+  collar:    '#ffffff',  // white collar
+  pants:     '#2a4a7a',  // navy trousers
+  pantsShad: '#1a2f50',
+  shoe:      '#1a1a1a',  // dark shoes
+  shoeSole:  '#3a3030',
+  outline:   '#1a0a00',  // dark outline
+  white:     '#ffffff',
+  eyeW:      '#e8e8e8',
+  eyeP:      '#3a2010',  // dark pupil
+  bagStrap:  '#8b6a30',  // backpack strap
+  bag:       '#6b5020',
+};
+
+// Draw one pixel (scaled 2× for crispness at game size)
+function px(ox, oy, col) {
+  ctx.fillStyle = col;
+  ctx.fillRect(ox, oy, 2, 2);
+}
+
+// Jax sprite — 16×20 logical pixels drawn at 2× = 32×40 px
+// frame: 0=idle, 1=walk-a, 2=walk-b
+// facing: 1=right, -1=left
+function drawJaxSprite(ox, oy, frame, facing) {
+  ctx.save();
+  // Flip for left-facing
+  if (facing === -1) {
+    ctx.translate(ox + 32, oy);
+    ctx.scale(-1, 1);
+    ox = 0; oy = 0;
+  }
+
+  // Helper — draw pixel row from array of [x, color]
+  function row(y, ...pixels) {
+    for (const [x, c] of pixels) px(ox + x*2, oy + y*2, c);
+  }
+
+  const S = JAX_PAL.skin, Ss = JAX_PAL.skinShad;
+  const H = JAX_PAL.hairA, Hb = JAX_PAL.hairB, Hh = JAX_PAL.hairC;
+  const P = JAX_PAL.polo, Ps = JAX_PAL.poloShad, Ph = JAX_PAL.poloHi;
+  const C = JAX_PAL.collar;
+  const N = JAX_PAL.pants, Ns = JAX_PAL.pantsShad;
+  const K = JAX_PAL.shoe, Ks = JAX_PAL.shoeSole;
+  const O = JAX_PAL.outline;
+  const Ep = JAX_PAL.eyeP, Ew = JAX_PAL.eyeW;
+
+  // Walk legs offsets
+  // frame 0: idle (feet together), 1: left forward, 2: right forward
+  const legA = frame === 1 ? -1 : (frame === 2 ? 1 : 0);  // left leg y offset
+  const legB = frame === 1 ? 1  : (frame === 2 ? -1 : 0); // right leg y offset
+
+  // ── ROW 0–1: shaggy blonde hair top ──
+  row(0,  [4,O],[5,Hb],[6,H],[7,Hh],[8,H],[9,O]);
+  row(1,  [3,O],[4,Hb],[5,H],[6,Hh],[7,H],[8,Hh],[9,H],[10,O]);
+
+  // ── ROW 2–3: hair sides + forehead ──
+  row(2,  [2,O],[3,H],[4,Hh],[5,S],[6,S],[7,S],[8,S],[9,H],[10,Hb],[11,O]);
+  row(3,  [2,Hb],[3,H],[4,S],[5,S],[6,S],[7,S],[8,S],[9,S],[10,H],[11,O]);
+
+  // ── ROW 4–5: eyes + hair sides ──
+  row(4,  [2,Hb],[3,S],[4,Ew],[5,Ep],[6,S],[7,S],[8,S],[9,Ep],[10,S],[11,Hb]);
+  row(5,  [2,O],[3,S],[4,S],[5,S],[6,S],[7,S],[8,S],[9,S],[10,S],[11,O]);
+
+  // ── ROW 6: nose/mouth area ──
+  row(6,  [3,O],[4,S],[5,S],[6,Ss],[7,S],[8,S],[9,S],[10,O]);
+
+  // ── ROW 7: chin + collar ──
+  row(7,  [4,O],[5,S],[6,S],[7,Ss],[8,S],[9,O]);
+
+  // ── ROW 8: collar / neck ──
+  row(8,  [4,O],[5,C],[6,C],[7,C],[8,C],[9,O]);
+
+  // ── ROW 9–11: polo body ──
+  row(9,  [3,O],[4,Ph],[5,P],[6,P],[7,P],[8,P],[9,P],[10,Ps],[11,O]);
+  row(10, [2,O],[3,P],[4,P],[5,P],[6,P],[7,P],[8,P],[9,P],[10,Ps],[11,O]);
+  row(11, [2,O],[3,Ph],[4,P],[5,P],[6,P],[7,P],[8,P],[9,Ps],[10,O]);
+
+  // ── ROW 12–13: arms + torso ──
+  row(12, [1,O],[2,S],[3,P],[4,P],[5,P],[6,P],[7,P],[8,P],[9,P],[10,S],[11,O]);
+  row(13, [1,Ss],[2,S],[3,Ph],[4,P],[5,P],[6,P],[7,P],[8,Ps],[9,P],[10,S],[11,Ss]);
+
+  // ── ROW 14: hands + waist ──
+  row(14, [1,O],[2,Ss],[3,O],[4,N],[5,N],[6,N],[7,N],[8,N],[9,O],[10,Ss],[11,O]);
+
+  // ── ROW 15: belt/waist ──
+  row(15, [3,O],[4,Ns],[5,N],[6,N],[7,N],[8,Ns],[9,O]);
+
+  // ── ROW 16–17: legs (animated) ──
+  // Left leg
+  const ll = 16 + legA;
+  row(Math.max(16, ll),   [3,O],[4,N],[5,N],[6,O]);
+  row(Math.max(17, ll+1), [3,N],[4,Ns],[5,N],[6,O]);
+  // Right leg
+  const rl = 16 + legB;
+  row(Math.max(16, rl),   [7,O],[8,N],[9,N],[10,O]);
+  row(Math.max(17, rl+1), [7,N],[8,Ns],[9,N],[10,O]);
+
+  // ── ROW 18–19: shoes ──
+  const sl = 18 + legA, sr = 18 + legB;
+  // Left shoe
+  row(Math.min(18, sl),   [3,O],[4,K],[5,K],[6,O]);
+  row(Math.min(19, sl+1), [3,Ks],[4,K],[5,K],[6,Ks]);
+  // Right shoe
+  row(Math.min(18, sr),   [7,O],[8,K],[9,K],[10,O]);
+  row(Math.min(19, sr+1), [7,Ks],[8,K],[9,K],[10,Ks]);
+
+  ctx.restore();
+}
+
+function drawJax() {
+  const x = jax.x - 2;  // center the 32px sprite over the 28px hitbox
+  const y = jax.y - 12; // sprite is 40px tall, hitbox 28px — offset up
+
+  // Determine walk frame (cycles 0→1→0→2→0)
+  let frame = 0;
+  if (jax.moving) {
+    const cycle = (jax.walkTime * 6) % 2; // 6 steps/sec
+    frame = cycle < 1 ? 1 : 2;
+  }
+
+  // Buff tint overlay
+  const buffCol = activeBuffs.find(b => b.type === 'speed_up') ? 'rgba(0,255,136,0.3)'
+                : activeBuffs.find(b => b.type === 'speed_down') ? 'rgba(255,136,0,0.3)'
+                : activeBuffs.find(b => b.type === 'push') ? 'rgba(255,102,136,0.3)'
+                : null;
+
+  ctx.save();
+
+  // Ground shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(x + 16, y + 41, 12, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Buff glow
+  if (buffCol) {
+    ctx.shadowColor = buffCol.replace('0.3', '1');
+    ctx.shadowBlur = 12;
+  }
+
+  drawJaxSprite(x, y, frame, jax.facing);
+
+  ctx.shadowBlur = 0;
+
+  // Name label
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3;
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'center';
+  ctx.strokeText('JAX', x + 16, y - 3);
+  ctx.fillText('JAX', x + 16, y - 3);
+
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────
+// CHANDLER PIXEL ART SPRITE — 34×46 (17×23 @ 2×)
+// 50s-ish white man, white shirt, black tie, khaki pants, scissors
+// ─────────────────────────────────────────────
+const CHA_PAL = {
+  skin:     '#e8b888',   // slightly older, more weathered
+  skinShad: '#b87848',
+  skinHi:   '#f0c898',
+  wrinkle:  '#c09060',   // wrinkle/age line color
+  hair:     '#1a1a1a',   // black hair
+  hairDark: '#0a0a0a',
+  hairHi:   '#383838',   // subtle highlight
+  shirt:    '#f0f0f0',   // white shirt
+  shirtShad:'#c8c8c8',
+  shirtHi:  '#ffffff',
+  tie:      '#101010',   // black tie
+  tieHi:    '#383838',
+  tieShi:   '#080808',
+  pants:    '#b8a870',   // khaki
+  pantsSh:  '#8a7a50',
+  pantsHi:  '#d0bf90',
+  shoe:     '#2a1a0a',
+  shoeSole: '#1a0f05',
+  scisA:    '#d0d8e0',   // scissor blade silver
+  scisB:    '#909aa0',   // scissor shadow
+  scisHan:  '#c03020',   // red handle
+  scisHanD: '#801a10',
+  outline:  '#100800',
+  eyeP:     '#202020',
+  eyeW:     '#e8e8e8',
+  brow:     '#1a1a1a',   // dark brows matching hair
+  mouth:    '#9a5848',
+  O:        '#100800',
+};
+
+function drawChandlerSprite(ox, oy, frame, facing, stunned) {
+  ctx.save();
+  if (facing === -1) {
+    ctx.translate(ox + 34, oy);
+    ctx.scale(-1, 1);
+    ox = 0; oy = 0;
+  }
+
+  function row(y, ...pixels) {
+    for (const [x, c] of pixels) px(ox + x*2, oy + y*2, c);
+  }
+
+  const S = stunned ? CHA_PAL.shirtShad : CHA_PAL.skin;
+  const Ss = CHA_PAL.skinShad, Sh = CHA_PAL.skinHi;
+  const Wr = CHA_PAL.wrinkle;  // age/wrinkle tone
+  const Hr = CHA_PAL.hair, Hd = CHA_PAL.hairDark, Hh = CHA_PAL.hairHi;
+  const W = CHA_PAL.shirt, Ws = CHA_PAL.shirtShad, Wh = CHA_PAL.shirtHi;
+  const T = CHA_PAL.tie, Th = CHA_PAL.tieHi;
+  const K = CHA_PAL.pants, Ks = CHA_PAL.pantsSh, Kh = CHA_PAL.pantsHi;
+  const E = CHA_PAL.shoe, Es = CHA_PAL.shoeSole;
+  const SA = CHA_PAL.scisA, SB = CHA_PAL.scisB;
+  const SH = CHA_PAL.scisHan, SD = CHA_PAL.scisHanD;
+  const O = CHA_PAL.O;
+  const Ep = CHA_PAL.eyeP, Ew = CHA_PAL.eyeW;
+  const Br = CHA_PAL.brow;
+  const Sk = stunned ? CHA_PAL.shirtShad : CHA_PAL.skin;
+
+  // Walk frames
+  const legA = frame === 1 ? -1 : (frame === 2 ? 1 : 0);
+  const legB = frame === 1 ? 1  : (frame === 2 ? -1 : 0);
+
+  // ── ROW 0–1: black hair top (side-parted, slightly receding) ──
+  row(0,  [4,O],[5,Hd],[6,Hr],[7,Hr],[8,Hh],[9,Hr],[10,Hd],[11,O]);
+  row(1,  [3,O],[4,Hd],[5,Hr],[6,Hr],[7,Hh],[8,Hr],[9,Hr],[10,Hd],[11,O]);
+
+  // ── ROW 2: hair sides + high forehead, slight widow's peak ──
+  row(2,  [3,Hd],[4,Hr],[5,Sk],[6,Sk],[7,Sk],[8,Sk],[9,Sk],[10,Hr],[11,Hd]);
+
+  // ── ROW 3: forehead with age line ──
+  row(3,  [2,O],[3,Hd],[4,Sk],[5,Sk],[6,Wr],[7,Sk],[8,Sk],[9,Sk],[10,Hd],[11,O]);
+
+  // ── ROW 4: heavy dark brows (older, more prominent) ──
+  row(4,  [2,O],[3,Sk],[4,Br],[5,Br],[6,Br],[7,Sk],[8,Br],[9,Br],[10,Sk],[11,O]);
+
+  // ── ROW 5: deep-set eyes with crow's feet hint ──
+  row(5,  [2,Ss],[3,Sk],[4,Ew],[5,Ep],[6,Sk],[7,Sk],[8,Ew],[9,Ep],[10,Sk],[11,Ss]);
+
+  // ── ROW 6: nose, bags under eyes, jowly cheeks ──
+  row(6,  [2,Wr],[3,Sk],[4,Sk],[5,Ss],[6,Sk],[7,Sk],[8,Ss],[9,Sk],[10,Sk],[11,Wr]);
+
+  // ── ROW 7: nasolabial folds + thin firm mouth ──
+  row(7,  [3,Wr],[4,Sk],[5,Sk],[6,CHA_PAL.mouth],[7,CHA_PAL.mouth],[8,Sk],[9,Sk],[10,Wr]);
+
+  // ── ROW 8: heavy jowled chin ──
+  row(8,  [2,O],[3,Ss],[4,Sk],[5,Sk],[6,Sk],[7,Sk],[8,Sk],[9,Ss],[10,O]);
+
+  // ── ROW 9: collar + neck ──
+  row(9,  [4,O],[5,Wh],[6,Wh],[7,T],[8,Wh],[9,Wh],[10,O]);
+
+  // ── ROW 10–13: white shirt body + tie ──
+  row(10, [2,O],[3,Wh],[4,W],[5,W],[6,T],[7,T],[8,W],[9,W],[10,Ws],[11,O]);
+  row(11, [2,O],[3,W],[4,W],[5,W],[6,Th],[7,T],[8,W],[9,W],[10,Ws],[11,O]);
+  row(12, [1,O],[2,Ws],[3,W],[4,W],[5,W],[6,T],[7,T],[8,W],[9,W],[10,Ws],[11,O]);
+  row(13, [1,O],[2,W],[3,W],[4,W],[5,W],[6,Th],[7,T],[8,W],[9,Ws],[10,O]);
+
+  // ── ROW 14: arms out — RIGHT arm holds scissors ──
+  // Left arm (just sleeve)
+  row(14, [0,O],[1,Ws],[2,W],[3,W],[4,W],[5,W],[6,Th],[7,T],[8,W],[9,W],[10,W],[11,O]);
+  row(15, [0,Ss],[1,Sk],[2,Ws],[3,W],[4,W],[5,Th],[6,T],[7,T],[8,W],[9,Ws],[10,Sk],[11,Ss]);
+
+  // ── ROW 16: waist/belt ──
+  row(16, [2,O],[3,Ks],[4,K],[5,K],[6,Ks],[7,K],[8,K],[9,Ks],[10,O]);
+
+  // ── OVERSIZED SCISSORS in right hand ──
+  // Handle (rows 13–16, right side)
+  row(12, [11,O],[12,SH],[13,SH],[14,O]);
+  row(13, [11,SH],[12,SD],[13,SH],[14,SH],[15,O]);
+  row(14, [11,SH],[12,SD],[13,SH],[14,O]);
+  row(15, [11,O],[12,SH],[13,SD],[14,O]);
+  // Pivot/screw
+  row(13, [14,O],[15,SA],[16,O]);
+  // Upper blade (angled up-right)
+  row(10, [14,O],[15,SA],[16,SA],[17,SA],[18,O]);
+  row(11, [13,O],[14,SB],[15,SA],[16,SA],[17,SA],[18,SA],[19,O]);
+  row(12, [13,SA],[14,SB],[15,SA],[16,SA],[17,SA],[18,SA],[19,SA],[20,O]);
+  row(13, [14,SA],[15,SB],[16,SA],[17,SA],[18,SA],[19,O]);
+  // Lower blade (angled down-right)
+  row(14, [14,O],[15,SA],[16,SA],[17,SA],[18,SA],[19,O]);
+  row(15, [13,O],[14,SB],[15,SA],[16,SA],[17,SA],[18,SA],[19,SA],[20,O]);
+  row(16, [13,SA],[14,SB],[15,SA],[16,SA],[17,SA],[18,O]);
+  row(17, [14,O],[15,SA],[16,SA],[17,O]);
+  // Blade tips (sharp points)
+  row(9,  [18,O],[19,SA],[20,SA],[21,O]);
+  row(10, [19,O],[20,SA],[21,O]);
+  row(18, [17,O],[18,SA],[19,SA],[20,O]);
+  row(19, [18,O],[19,SA],[20,O]);
+
+  // ── ROWS 17–19: legs (animated) ──
+  const ll = 17 + legA, rl = 17 + legB;
+  // Left leg
+  row(Math.max(17,ll),   [3,O],[4,Kh],[5,K],[6,O]);
+  row(Math.max(18,ll+1), [3,K],[4,Ks],[5,K],[6,O]);
+  row(Math.max(19,ll+2), [3,K],[4,Ks],[5,Kh],[6,O]);
+  // Right leg
+  row(Math.max(17,rl),   [7,O],[8,Kh],[9,K],[10,O]);
+  row(Math.max(18,rl+1), [7,K],[8,Ks],[9,K],[10,O]);
+  row(Math.max(19,rl+2), [7,K],[8,Ks],[9,Kh],[10,O]);
+
+  // ── ROWS 20–22: shoes ──
+  const sl = 20 + legA, sr = 20 + legB;
+  row(Math.min(20,sl),   [3,O],[4,E],[5,E],[6,O]);
+  row(Math.min(21,sl+1), [2,O],[3,Es],[4,E],[5,E],[6,Es],[7,O]);
+  row(Math.min(20,sr),   [7,O],[8,E],[9,E],[10,O]);
+  row(Math.min(21,sr+1), [6,O],[7,Es],[8,E],[9,E],[10,Es],[11,O]);
+
+  ctx.restore();
+}
+
+function drawChandler() {
+  const x = chandler.x - 3;   // center 34px sprite over 28px hitbox
+  const y = chandler.y - 14;  // 46px tall sprite, offset up
+  const stunned = chandler.stun > 0;
+
+  // Walk frame
+  let frame = 0;
+  if (!stunned) {
+    const jcx = jax.x + PLAYER_SIZE/2, jcy = jax.y + PLAYER_SIZE/2;
+    const ccx = chandler.x + CHANDLER_SIZE/2, ccy = chandler.y + CHANDLER_SIZE/2;
+    const dx = jcx - ccx;
+    const dist = Math.sqrt((jcx-ccx)**2 + (jcy-ccy)**2);
+    if (dist > 4) {
+      chandler.facing = dx > 0 ? 1 : -1;
+      const cycle = (chandler.walkTime * 5) % 2;
+      frame = cycle < 1 ? 1 : 2;
+    }
+  }
+
+  ctx.save();
+
+  // Ground shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(x + 17, y + 47, 13, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Stun glow only — no red overlay when chasing
+  if (stunned) {
+    ctx.shadowColor = '#ffcc00';
+    ctx.shadowBlur = 16;
+  }
+
+  drawChandlerSprite(x, y, frame, chandler.facing || 1, stunned);
+
+  ctx.shadowBlur = 0;
+
+  // Stun bar above
+  if (stunned) {
+    const barW = 40;
+    const barX = chandler.x + CHANDLER_SIZE/2 - barW/2;
+    const barY = y - 12;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(barX, barY, barW, 7);
+    ctx.fillStyle = '#ffcc00';
+    ctx.fillRect(barX, barY, barW * (chandler.stun / 2), 7);
+    ctx.strokeStyle = '#aa8800';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, 7);
+  }
+
+  // Name label
+  const labelY = y - (stunned ? 22 : 4);
+  ctx.fillStyle = stunned ? '#ffcc00' : '#ff4444';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3;
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'center';
+  ctx.strokeText(stunned ? 'STUNNED' : 'CHANDLER', x + 17, labelY);
+  ctx.fillText(stunned ? 'STUNNED' : 'CHANDLER', x + 17, labelY);
+
+  ctx.restore();
+}
+
+function drawPickupObjects(t) {
+  for (const o of objects) {
+    if (o.kind !== 'pickup') continue;
+    const def = PICKUP_DEFS[o.type];
+    if (!def) continue;
+    const pulse = 0.92 + Math.sin(t * 3 + o.pulse) * 0.08;
+    const s = o.w;
+    ctx.save();
+    ctx.translate(o.x + s/2, o.y + s/2);
+    ctx.scale(pulse, pulse);
+    ctx.shadowColor = def.color;
+    ctx.shadowBlur = 10;
+    // background
+    ctx.fillStyle = def.color;
+    ctx.fillRect(-s/2, -s/2, s, s);
+    // highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillRect(-s/2 + 2, -s/2 + 2, 6, 4);
+    // border
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-s/2, -s/2, s, s);
+    // label
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 7px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(def.label, 0, 3);
+    ctx.restore();
+  }
+}
+
+function drawChairs() {
+  for (const o of objects) {
+    if (o.kind !== 'pushable') continue;
+    ctx.save();
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(o.x + 3, o.y + o.h, o.w - 3, 5);
+    // seat top
+    ctx.fillStyle = '#8b6040';
+    ctx.fillRect(o.x, o.y, o.w, o.h);
+    // highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(o.x + 2, o.y + 2, 6, 3);
+    // dark edge
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(o.x + o.w - 5, o.y + 3, 4, o.h - 3);
+    ctx.fillRect(o.x + 3, o.y + o.h - 5, o.w - 3, 4);
+    // backrest
+    ctx.fillStyle = '#6b4828';
+    ctx.fillRect(o.x + 2, o.y - 10, o.w - 4, 10);
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(o.x + 3, o.y - 9, 4, 8);
+    ctx.restore();
+  }
+}
+
+// ─────────────────────────────────────────────
+// HUD
+// ─────────────────────────────────────────────
+function drawHUD(t) {
+  ctx.save();
+  // HUD panel
+  ctx.fillStyle = 'rgba(10,10,20,0.82)';
+  ctx.fillRect(10, 10, 280, 72);
+  ctx.strokeStyle = '#334466';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(10, 10, 280, 72);
+
+  ctx.fillStyle = '#88aaff';
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('Level 1/5: School Hallway', 20, 30);
+
+  ctx.fillStyle = '#44ccff';
+  ctx.font = '12px monospace';
+  ctx.fillText(`This level: ${levelTime.toFixed(2)}s`, 20, 50);
+  ctx.fillText('Move cursor to guide Jax', 20, 68);
+
+  // Buff bars
+  let buffY = 90;
+  for (const b of activeBuffs) {
+    const pct = b.remaining / b.duration;
+    const colors = { speed_up: '#00ff88', speed_down: '#ff8800', push: '#ff6688' };
+    const col = colors[b.type] || '#ffffff';
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(10, buffY, 160, 18);
+    ctx.fillStyle = col;
+    ctx.fillRect(10, buffY, 160 * pct, 18);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(10, buffY, 160, 18);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 10px monospace';
+    const labels = { speed_up: 'SPEED UP!', speed_down: 'SLOWED', push: 'PUSHED!' };
+    ctx.fillText(labels[b.type] || b.type.toUpperCase(), 16, buffY + 13);
+    buffY += 22;
+  }
+
+  // Legend (bottom right)
+  drawLegend();
+
+  ctx.restore();
+}
+
+function drawLegend() {
+  const lx = VW - 210, ly = VH - 240;
+  ctx.fillStyle = 'rgba(10,10,20,0.82)';
+  ctx.fillRect(lx, ly, 200, 220);
+  ctx.strokeStyle = '#334466';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(lx, ly, 200, 220);
+
+  ctx.fillStyle = '#88aaff';
+  ctx.font = 'bold 12px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('LEGEND', lx + 10, ly + 20);
+
+  const items = [
+    { col: '#4dabf7', label: 'Jax (you)' },
+    { col: '#e03040', label: 'Chandler' },
+    { col: '#00ff88', label: 'Exit' },
+    { col: PAL.lockerA, label: 'Locker' },
+    { col: '#8b6040', label: 'Chair (pushable)' },
+    { col: '#f0d020', label: 'Hair Gel (+speed)' },
+    { col: '#c0d8e8', label: 'Mirror (stun)' },
+    { col: '#c0c0c0', label: 'Hairspray (push)' },
+  ];
+  ctx.font = '11px monospace';
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const iy = ly + 38 + i * 22;
+    ctx.fillStyle = item.col;
+    ctx.fillRect(lx + 10, iy - 8, 14, 14);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(lx + 10, iy - 8, 14, 14);
+    ctx.fillStyle = '#cccccc';
+    ctx.fillText(item.label, lx + 32, iy + 4);
+  }
+}
+
+function drawGameOver() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.fillRect(0, 0, VW, VH);
+  ctx.fillStyle = '#e03040';
+  ctx.font = 'bold 64px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('CAUGHT!', VW/2, VH/2 - 60);
+  ctx.fillStyle = '#cccccc';
+  ctx.font = '28px monospace';
+  ctx.fillText(`Time: ${levelTime.toFixed(2)}s`, VW/2, VH/2);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '22px monospace';
+  ctx.fillText('Chandler got Jax!', VW/2, VH/2 + 50);
+
+  buttons = [];
+  drawButton(VW/2 - 100, VH/2 + 100, 200, 50, 'TRY AGAIN', '#e03040', '#ffffff');
+  ctx.restore();
+}
+
+function drawWin() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.fillRect(0, 0, VW, VH);
+  ctx.fillStyle = '#00ff88';
+  ctx.font = 'bold 64px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('ESCAPED!', VW/2, VH/2 - 60);
+  ctx.fillStyle = '#cccccc';
+  ctx.font = '28px monospace';
+  ctx.fillText(`Level 1 Time: ${levelTime.toFixed(2)}s`, VW/2, VH/2);
+  ctx.fillStyle = '#aaaaaa';
+  ctx.font = '20px monospace';
+  ctx.fillText('(Levels 2-5 coming soon)', VW/2, VH/2 + 50);
+
+  buttons = [];
+  drawButton(VW/2 - 100, VH/2 + 100, 200, 50, 'PLAY AGAIN', '#00aa55', '#ffffff');
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────
+// BUTTON SYSTEM
+// ─────────────────────────────────────────────
+function drawButton(x, y, w, h, label, bg, fg) {
+  ctx.fillStyle = bg;
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(x, y, w, 4);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(x, y + h - 4, w, 4);
+  ctx.fillStyle = fg;
+  ctx.font = 'bold 20px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x + w/2, y + h/2 + 7);
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+  buttons.push({ x, y, w, h, label });
+}
+
+function handleClick(e) {
+  const r = canvas.getBoundingClientRect();
+  const cx = e.clientX - r.left;
+  const cy = e.clientY - r.top;
+  for (const btn of buttons) {
+    if (cx >= btn.x && cx <= btn.x + btn.w && cy >= btn.y && cy <= btn.y + btn.h) {
+      if (btn.label === 'TRY AGAIN' || btn.label === 'PLAY AGAIN') {
+        resetLevel();
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// EXIT COMPASS (off-screen arrow)
+// ─────────────────────────────────────────────
+function drawExitCompass() {
+  const ex = 3060 + 45, ey = 200 + 45;
+  const jcx = jax.x + PLAYER_SIZE/2, jcy = jax.y + PLAYER_SIZE/2;
+  const dx = ex - jcx, dy = ey - jcy;
+  const angle = Math.atan2(dy, dx);
+
+  const hx = VW - 80, hy = 80;
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.fillStyle = 'rgba(10,10,20,0.8)';
+  ctx.beginPath();
+  ctx.arc(0, 0, 28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#00ff88';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.rotate(angle);
+  ctx.fillStyle = '#00ff88';
+  ctx.beginPath();
+  ctx.moveTo(18, 0);
+  ctx.lineTo(-8, -7);
+  ctx.lineTo(-8, 7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = '#00ff88';
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('EXIT', hx, hy + 44);
+}
+
+// ─────────────────────────────────────────────
+// PARTICLES
+// ─────────────────────────────────────────────
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 80 + Math.random() * 160;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.6 + Math.random() * 0.4,
+      maxLife: 1,
+      color, size: 4 + Math.random() * 6
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (const p of particles) {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= 0.9;
+    p.vy *= 0.9;
+    p.life -= dt;
+  }
+  particles = particles.filter(p => p.life > 0);
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ─────────────────────────────────────────────
+// LEVEL INIT
+// ─────────────────────────────────────────────
+function resetLevel() {
+  jax = { x: 160, y: 2100, w: PLAYER_SIZE, h: PLAYER_SIZE, vx: 0, vy: 0,
+          facing: 1, walkTime: 0, moving: false };
+  chandler = { x: 160, y: 200, w: CHANDLER_SIZE, h: CHANDLER_SIZE, vx: 0, vy: 0, stun: 0, facing: 1, walkTime: 0 };
+  levelTime = 0;
+  activeBuffs = [];
+  particles = [];
+  objects = [...buildWalls(), ...buildChairs(), ...buildPickups()];
+  gameState = 'playing';
+  buttons = [];
+  chandlerPath = [];
+  pathTimer = 0;
+  stuckTimer = 0;
+  stuckLastPos = { x: 160, y: 200 };
+  navGrid = null;
+  buildNavGrid();
+  updateCamera();
+}
+
+// ─────────────────────────────────────────────
+// UPDATE
+// ─────────────────────────────────────────────
+function update(dt) {
+  if (gameState !== 'playing') return;
+
+  levelTime += dt;
+  exitPulse += dt;
+  tickBuffs(dt);
+  updateParticles(dt);
+
+  // Jax movement toward mouse
+  const jcx = jax.x + PLAYER_SIZE/2, jcy = jax.y + PLAYER_SIZE/2;
+  const dx = mouse.x - jcx, dy = mouse.y - jcy;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const speed = PLAYER_SPEED * buffSpeedMult();
+  const pushVec = buffPushVec();
+
+  const isMoving = dist > 4;
+  jax.moving = isMoving;
+
+  if (isMoving) {
+    const move = Math.min(speed * dt, dist);
+    jax.x += (dx / dist) * move + pushVec.vx * dt;
+    jax.y += (dy / dist) * move + pushVec.vy * dt;
+    // Face left or right based on horizontal movement
+    if (Math.abs(dx) > 4) jax.facing = dx > 0 ? 1 : -1;
+    jax.walkTime += dt;
+  } else {
+    jax.x += pushVec.vx * dt;
+    jax.y += pushVec.vy * dt;
+    if (Math.abs(pushVec.vx) > 10) jax.facing = pushVec.vx > 0 ? 1 : -1;
+    jax.walkTime = 0;
+  }
+
+  // Clamp jax to map
+  jax.x = Math.max(WALL_THICK, Math.min(MAP_W - WALL_THICK - PLAYER_SIZE, jax.x));
+  jax.y = Math.max(WALL_THICK, Math.min(MAP_H - WALL_THICK - PLAYER_SIZE, jax.y));
+
+  // Chandler chase
+  if (chandler.stun > 0) {
+    chandler.stun -= dt;
+    chandler.walkTime = 0;
+  } else {
+    const cdx = jax.x - chandler.x, cdy = jax.y - chandler.y;
+    const cdist = Math.sqrt(cdx*cdx + cdy*cdy) || 1;
+    chandler.x += (cdx / cdist) * CHANDLER_SPEED * dt;
+    chandler.y += (cdy / cdist) * CHANDLER_SPEED * dt;
+    if (cdist > 4) chandler.walkTime += dt;
+  }
+  chandler.x = Math.max(WALL_THICK, Math.min(MAP_W - WALL_THICK - CHANDLER_SIZE, chandler.x));
+  chandler.y = Math.max(WALL_THICK, Math.min(MAP_H - WALL_THICK - CHANDLER_SIZE, chandler.y));
+
+  // Pushable physics
+  const solids = objects.filter(o => o.kind === 'wall' || o.kind === 'pushable');
+  for (const o of objects) {
+    if (o.kind !== 'pushable') continue;
+    o.x += o.vx * dt;
+    o.y += o.vy * dt;
+    o.x = Math.max(WALL_THICK, Math.min(MAP_W - WALL_THICK - o.w, o.x));
+    o.y = Math.max(WALL_THICK, Math.min(MAP_H - WALL_THICK - o.h, o.y));
+    o.vx *= Math.exp(-PUSH_DRAG * dt);
+    o.vy *= Math.exp(-PUSH_DRAG * dt);
+    if (Math.abs(o.vx) < 2) o.vx = 0;
+    if (Math.abs(o.vy) < 2) o.vy = 0;
+    // Pushable vs walls
+    const walls = objects.filter(w => w.kind === 'wall');
+    for (const w of walls) {
+      if (overlaps(o, w)) {
+        resolveAABB(o, w);
+        // Stop velocity on collision axis
+        const ex = o.x + o.w/2, ey = o.y + o.h/2;
+        const wx = w.x + w.w/2, wy = w.y + w.h/2;
+        const ox2 = (o.w/2 + w.w/2) - Math.abs(ex - wx);
+        const oy2 = (o.h/2 + w.h/2) - Math.abs(ey - wy);
+        if (ox2 < oy2) o.vx = 0; else o.vy = 0;
+      }
+    }
+  }
+
+  // Player vs solids
+  const jaxObj = { x: jax.x, y: jax.y, w: PLAYER_SIZE, h: PLAYER_SIZE };
+  for (let pass = 0; pass < 3; pass++) {
+    for (const s of solids) {
+      if (overlaps(jaxObj, s)) {
+        if (s.kind === 'pushable') {
+          const ex = jaxObj.x + PLAYER_SIZE/2, ey = jaxObj.y + PLAYER_SIZE/2;
+          const sx = s.x + s.w/2, sy = s.y + s.h/2;
+          const d = Math.sqrt((sx-ex)**2 + (sy-ey)**2) || 1;
+          s.vx = ((sx-ex)/d) * PUSH_FORCE;
+          s.vy = ((sy-ey)/d) * PUSH_FORCE;
+        }
+        resolveAABB(jaxObj, s);
+      }
+    }
+  }
+  jax.x = jaxObj.x; jax.y = jaxObj.y;
+
+  // Chandler vs walls
+  const chandlerObj = { x: chandler.x, y: chandler.y, w: CHANDLER_SIZE, h: CHANDLER_SIZE };
+  const chandlerSolids = objects.filter(o => o.kind === 'wall' || o.kind === 'pushable');
+  for (let pass = 0; pass < 2; pass++) {
+    for (const s of chandlerSolids) {
+      if (overlaps(chandlerObj, s)) resolveAABB(chandlerObj, s);
+    }
+  }
+  chandler.x = chandlerObj.x; chandler.y = chandlerObj.y;
+
+  // Pickup checks
+  for (let i = objects.length - 1; i >= 0; i--) {
+    const o = objects[i];
+    if (o.kind !== 'pickup') continue;
+    if (overlaps(jaxObj, o)) {
+      const def = PICKUP_DEFS[o.type];
+      if (def) {
+        if (def.effect === 'speed_up') applyBuff('speed_up');
+        else if (def.effect === 'stun') chandler.stun = 2;
+        else if (def.effect === 'push') {
+          const jx = jax.x + PLAYER_SIZE/2, jy = jax.y + PLAYER_SIZE/2;
+          const cx = chandler.x + CHANDLER_SIZE/2, cy = chandler.y + CHANDLER_SIZE/2;
+          const d = Math.sqrt((jx-cx)**2 + (jy-cy)**2) || 1;
+          applyBuff('push', { vx: ((jx-cx)/d)*400, vy: ((jy-cy)/d)*400 });
+        }
+        spawnParticles(o.x + o.w/2, o.y + o.h/2, def.color, 12);
+      }
+      objects.splice(i, 1);
+    }
+  }
+
+  // Exit check
+  const exitObj = { x: 3060, y: 200, w: 90, h: 90 };
+  if (overlaps(jaxObj, exitObj)) {
+    gameState = 'win';
+  }
+
+  // Chandler catch check
+  if (overlaps(jaxObj, chandlerObj)) {
+    gameState = 'game_over';
+    spawnParticles(jax.x + PLAYER_SIZE/2, jax.y + PLAYER_SIZE/2, '#e03040', 20);
+  }
+
+  // Camera follows Jax
+  updateCamera();
+}
+
+
+// ─────────────────────────────────────────────
+// MAIN DRAW
+// ─────────────────────────────────────────────
+let t = 0;
+function draw() {
+  ctx.clearRect(0, 0, VW, VH);
+
+  // Apply camera transform — everything drawn in world space
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+
+  // Only draw the portion of the map visible in viewport (clipped to world)
+  drawMap();
+  drawChairs();
+  drawPickupObjects(t);
+  drawExit(t);
+  drawJax();
+  drawChandler();
+  drawParticles();
+
+  ctx.restore();
+
+  // HUD drawn in screen space (no camera offset)
+  if (gameState === 'playing') {
+    drawHUD(t);
+    drawExitCompass();
+  }
+  if (gameState === 'game_over') {
+    drawHUD(t);
+    drawGameOver();
+  }
+  if (gameState === 'win') {
+    drawWin();
+  }
+}
+
+// ─────────────────────────────────────────────
+// GAME LOOP
+// ─────────────────────────────────────────────
+let lastTime = null;
+function loop(ts) {
+  if (lastTime === null) lastTime = ts;
+  const dt = Math.min((ts - lastTime) / 1000, 0.1);
+  lastTime = ts;
+  t += dt;
+
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+initPatterns();
+resetLevel();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

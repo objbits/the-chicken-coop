@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Map Builder — Chandler's World</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: #0d0d1a; color: #d0d0e0;
+  font-family: monospace; font-size: 13px;
+}
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* ── Toolbar ── */
+#toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 12px; background: #12122a;
+  border-bottom: 1px solid #2a2a4a; flex-shrink: 0;
+}
+.title { font-weight: bold; color: #88aaff; }
+.sep { width: 1px; height: 22px; background: #2a2a4a; margin: 0 2px; }
+
+button {
+  background: #1e1e3a; color: #c0c0e0; border: 1px solid #3a3a5a;
+  padding: 4px 10px; cursor: pointer; font-family: monospace; font-size: 12px;
+  border-radius: 3px; transition: background 0.1s;
+}
+button:hover { background: #2a2a4a; }
+button.active { background: #3a5aaa; border-color: #5a7acc; color: #fff; }
+button:disabled { opacity: 0.4; cursor: default; }
+
+#zoom-label { min-width: 30px; text-align: center; color: #8888aa; font-size: 12px; }
+#status { margin-left: auto; color: #555577; font-size: 11px; }
+.warn { color: #ff8855; }
+.ok   { color: #44cc88; }
+
+/* ── Workspace ── */
+#workspace { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Grid ── */
+#grid-wrap { flex: 1; position: relative; overflow: hidden; }
+#grid-canvas { display: block; }
+
+/* ── Sidebar ── */
+#sidebar {
+  width: 264px; flex-shrink: 0; background: #12122a;
+  border-left: 1px solid #2a2a4a;
+  display: flex; flex-direction: column;
+}
+#sidebar-scroll {
+  flex: 1; overflow-y: auto; padding: 14px;
+  min-height: 0;
+}
+#sidebar-footer {
+  flex-shrink: 0; padding: 10px 14px 12px;
+  border-top: 1px solid #2a2a4a; background: #0d0d1a;
+  font-size: 11px; line-height: 1.9;
+}
+#no-sel { color: #44446a; text-align: center; padding: 48px 0; font-size: 12px; line-height: 1.8; }
+#cell-editor h3 { color: #88aaff; margin-bottom: 14px; font-size: 13px; }
+
+.field { margin-bottom: 14px; }
+.field > label {
+  display: block; color: #7777aa; margin-bottom: 5px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
+}
+select {
+  width: 100%; background: #1e1e3a; color: #d0d0e0;
+  border: 1px solid #3a3a5a; padding: 5px 6px;
+  font-family: monospace; font-size: 12px; border-radius: 3px; cursor: pointer;
+}
+select:focus { outline: none; border-color: #5a7acc; }
+
+/* Border compass */
+.border-compass {
+  display: grid;
+  grid-template-columns: 1fr 60px 1fr;
+  grid-template-rows: 28px 28px 28px;
+  gap: 3px; width: 132px; margin: 0 auto;
+}
+.bc-empty { background: transparent; }
+.bc-center {
+  background: #0d0d1a; border: 1px solid #2a2a4a;
+  border-radius: 3px; display: flex; align-items: center;
+  justify-content: center; color: #333355; font-size: 10px;
+}
+.border-btn {
+  background: #1e1e3a; border: 1px solid #3a3a5a;
+  border-radius: 3px; color: #8888aa; cursor: pointer;
+  font-family: monospace; font-size: 11px; font-weight: bold;
+  display: flex; align-items: center; justify-content: center;
+  user-select: none; transition: background 0.1s;
+}
+.border-btn:hover { background: #2a2a4a; }
+.border-btn.active { background: #7a2020; border-color: #cc4444; color: #ff8888; }
+
+/* Special buttons */
+.special-row { display: flex; gap: 4px; }
+.spec-btn {
+  flex: 1; font-size: 11px; padding: 5px 4px;
+  text-align: center; border-radius: 3px;
+}
+#s-player             { border-color: #2a4a7a; }
+#s-player:hover       { background: #1a3a6a; }
+#s-player.active      { background: #4dabf7; border-color: #4dabf7; color: #000; font-weight: bold; }
+#s-exit               { border-color: #1a5a2a; }
+#s-exit:hover         { background: #1a4a1a; }
+#s-exit.active        { background: #00ff88; border-color: #00ff88; color: #000; font-weight: bold; }
+#s-villain            { border-color: #5a2020; }
+#s-villain:hover      { background: #4a1a1a; }
+#s-villain.active     { background: #ff4444; border-color: #ff4444; color: #fff; font-weight: bold; }
+
+.danger-btn {
+  width: 100%; margin-top: 2px;
+  background: #1e0e0e; border-color: #4a2020; color: #aa5555;
+}
+.danger-btn:hover { background: #2e1010; }
+
+hr.divider { border: none; border-top: 1px solid #2a2a4a; margin: 16px 0; }
+
+/* ── Background swatches ── */
+#bg-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.bg-swatch {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  cursor: pointer; padding: 3px; border-radius: 3px;
+  border: 1px solid #2a2a4a;
+}
+.bg-swatch:hover { border-color: #4a4a6a; background: #161628; }
+.bg-swatch.active { border-color: #5a7acc; background: #1a2a4a; }
+.bg-swatch canvas { width: 100%; aspect-ratio: 1/1; border-radius: 2px; image-rendering: pixelated; }
+.bg-swatch span { font-size: 9px; color: #555577; text-align: center; line-height: 1.2; }
+.bg-swatch.active span { color: #88aaff; }
+
+/* ── Templates Modal ── */
+#templates-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+#modal-box {
+  background: #12122a; border: 1px solid #3a3a5a; border-radius: 6px;
+  padding: 20px; width: min(720px, 94vw); max-height: 82vh;
+  overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
+}
+#modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+#modal-header span { font-weight: bold; color: #88aaff; font-size: 14px; }
+#modal-close { padding: 2px 8px; font-size: 14px; }
+#modal-subtitle { color: #555577; font-size: 11px; }
+#template-cards {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.tpl-card {
+  background: #0d0d1a; border: 1px solid #2a2a4a; border-radius: 4px;
+  padding: 12px; display: flex; flex-direction: column; gap: 7px;
+}
+.tpl-card:hover { border-color: #3a3a6a; }
+.tpl-preview {
+  display: block; width: 100%; border-radius: 3px;
+  border: 1px solid #1e1e38; image-rendering: pixelated;
+}
+.tpl-name { font-weight: bold; color: #c8c8e8; font-size: 12px; }
+.tpl-desc { color: #555577; font-size: 11px; line-height: 1.5; }
+.tpl-load { width: 100%; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <span class="title">Map Builder</span>
+    <div class="sep"></div>
+
+    <div style="display:flex;gap:3px">
+      <button id="t-select" class="active" title="S — Select cells">Select</button>
+      <button id="t-paint"  title="P — Place cells">Place</button>
+      <button id="t-erase"  title="E — Erase cells">Erase</button>
+    </div>
+
+    <div class="sep"></div>
+
+    <div style="display:flex;align-items:center;gap:4px">
+      <button id="zoom-out" title="Zoom out (-)">−</button>
+      <span id="zoom-label">16px</span>
+      <button id="zoom-in"  title="Zoom in (+)">+</button>
+    </div>
+
+    <div class="sep"></div>
+
+    <div style="display:flex;gap:3px">
+      <button id="btn-new">New</button>
+      <button id="btn-templates">Templates</button>
+      <button id="btn-load">Load JSON</button>
+      <button id="btn-export">Export JSON</button>
+      <input type="file" id="file-input" accept=".json" style="display:none">
+    </div>
+
+    <span id="status">0 cells</span>
+  </div>
+
+  <!-- Templates Modal -->
+  <div id="templates-modal" style="display:none">
+    <div id="modal-box">
+      <div id="modal-header">
+        <span>Pre-built Maps</span>
+        <button id="modal-close">✕</button>
+      </div>
+      <p id="modal-subtitle">AI-designed starter maps — load one to explore or use as a base.</p>
+      <div id="template-cards"></div>
+    </div>
+  </div>
+
+  <!-- Workspace -->
+  <div id="workspace">
+    <div id="grid-wrap">
+      <canvas id="grid-canvas"></canvas>
+    </div>
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+    <div id="sidebar-scroll">
+
+      <!-- Always-visible background picker -->
+      <div class="field">
+        <label>Background</label>
+        <div id="bg-swatches"></div>
+      </div>
+      <hr class="divider">
+
+      <div id="no-sel">
+        Select a cell to edit it.<br><br>
+        Use <b>Place</b> to activate cells,<br>
+        <b>Erase</b> to remove them.
+      </div>
+
+      <div id="cell-editor" style="display:none">
+        <h3 id="cell-title">Cell [0, 0]</h3>
+
+        <div class="field">
+          <label>Background</label>
+          <select id="bg-select">
+            <option value="empty">Empty</option>
+            <option value="hallway">Hallway</option>
+            <option value="grass">Grass</option>
+            <option value="cafeteria">Cafeteria</option>
+            <option value="carpet">Carpet (Office)</option>
+            <option value="dirt">Dirt (Baseball)</option>
+            <option value="concrete">Concrete</option>
+            <option value="asphalt">Asphalt</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Borders — blocked = wall</label>
+          <div class="border-compass">
+            <div class="bc-empty"></div>
+            <button class="border-btn" id="b-n">N</button>
+            <div class="bc-empty"></div>
+
+            <button class="border-btn" id="b-w">W</button>
+            <div class="bc-center">□</div>
+            <button class="border-btn" id="b-e">E</button>
+
+            <div class="bc-empty"></div>
+            <button class="border-btn" id="b-s">S</button>
+            <div class="bc-empty"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Object</label>
+          <select id="obj-select">
+            <option value="">None</option>
+            <option value="wall">Wall (blocks all)</option>
+            <option value="mud">Mud (slows Jax)</option>
+            <option value="pushable">Pushable</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Special</label>
+          <div class="special-row">
+            <button class="spec-btn" id="s-player">Jax</button>
+            <button class="spec-btn" id="s-exit">Exit</button>
+            <button class="spec-btn" id="s-villain">Chandler</button>
+          </div>
+        </div>
+
+        <hr class="divider">
+
+        <button class="danger-btn" id="btn-deactivate">Deactivate Cell</button>
+      </div>
+
+    </div><!-- /sidebar-scroll -->
+    <div id="sidebar-footer"></div>
+    </div><!-- /sidebar -->
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────
+const MAP_VERSION = 1;
+const GRID_COLS   = 60;
+const GRID_ROWS   = 60;
+const ZOOM_LEVELS = [8, 12, 16, 20, 28, 40];
+
+const BG_BASE = {
+  empty:     '#1a1a2e',
+  hallway:   '#c8a970',
+  grass:     '#3a8a3a',
+  cafeteria: '#d8d0b4',
+  carpet:    '#6a306a',
+  dirt:      '#9a6040',
+  concrete:  '#7a7a8a',
+  asphalt:   '#3a3a4a',
+};
+
+const OPPOSITE = { n:'s', s:'n', e:'w', w:'e' };
+const DELTA    = { n:[0,-1], s:[0,1], e:[1,0], w:[-1,0] };
+
+const OBJ_FILL = {
+  wall:     'rgba(180,120,60,0.55)',
+  mud:      'rgba(80,65,20,0.60)',
+  pushable: 'rgba(60,90,160,0.55)',
+};
+const OBJ_LABEL = { wall: 'W', mud: 'M', pushable: 'P' };
+
+const SPEC_COLOR = { player: '#4dabf7', exit: '#00ff88', villain: '#ff4444' };
+const SPEC_LABEL = { player: 'J', exit: 'X', villain: 'C' };
+
+// ─────────────────────────────────────────────
+// BACKGROUND CANVAS CACHE (64×64 per style)
+// ─────────────────────────────────────────────
+const bgCache = {};
+
+function buildBgCache() {
+  for (const [key, base] of Object.entries(BG_BASE)) {
+    const oc = document.createElement('canvas');
+    oc.width = 64; oc.height = 64;
+    const c = oc.getContext('2d');
+    c.fillStyle = base;
+    c.fillRect(0, 0, 64, 64);
+
+    if (key === 'hallway') {
+      c.strokeStyle = 'rgba(0,0,0,0.14)';
+      c.lineWidth = 1;
+      for (let i = 16; i < 64; i += 16) {
+        c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 64); c.stroke();
+        c.beginPath(); c.moveTo(0, i); c.lineTo(64, i); c.stroke();
+      }
+    } else if (key === 'grass') {
+      c.fillStyle = 'rgba(0,0,0,0.10)';
+      for (let i = 0; i < 18; i++) {
+        c.fillRect(Math.random()*62, Math.random()*62, 3, 3);
+      }
+    } else if (key === 'cafeteria') {
+      c.strokeStyle = 'rgba(0,0,0,0.10)';
+      c.lineWidth = 1;
+      for (let i = 12; i < 64; i += 12) {
+        c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 64); c.stroke();
+        c.beginPath(); c.moveTo(0, i); c.lineTo(64, i); c.stroke();
+      }
+    } else if (key === 'carpet') {
+      c.strokeStyle = 'rgba(255,255,255,0.06)';
+      c.lineWidth = 1;
+      for (let i = -64; i < 128; i += 8) {
+        c.beginPath(); c.moveTo(i, 0); c.lineTo(i + 64, 64); c.stroke();
+      }
+    } else if (key === 'dirt') {
+      c.fillStyle = 'rgba(0,0,0,0.13)';
+      for (let i = 0; i < 28; i++) {
+        c.beginPath();
+        c.arc(Math.random()*64, Math.random()*64, 1.5, 0, Math.PI*2);
+        c.fill();
+      }
+    } else if (key === 'concrete') {
+      c.strokeStyle = 'rgba(0,0,0,0.14)';
+      c.lineWidth = 0.8;
+      c.beginPath(); c.moveTo(8, 22); c.lineTo(30, 27); c.lineTo(52, 19); c.stroke();
+      c.beginPath(); c.moveTo(4, 50); c.lineTo(38, 56); c.lineTo(60, 48); c.stroke();
+    } else if (key === 'asphalt') {
+      c.fillStyle = 'rgba(255,255,255,0.03)';
+      for (let i = 0; i < 12; i++) {
+        c.fillRect(Math.random()*62, Math.random()*62, 2, 2);
+      }
+    }
+
+    bgCache[key] = oc;
+  }
+}
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let cells       = {};     // "col,row" → { background, borders, object, special }
+let playerStart = null;   // [col, row]
+let exitPos     = null;
+let villainPos  = null;
+let selected    = null;   // { col, row }
+
+let zoomIdx   = 2;
+let cellSize  = ZOOM_LEVELS[zoomIdx];
+let panX = 0, panY = 0;
+let tool            = 'select';
+let paintBackground = 'hallway';
+
+let isPainting  = false;
+let isPanning   = false;
+let panOrigin   = null;
+let lastPainted = null;
+
+const canvas  = document.getElementById('grid-canvas');
+const ctx     = canvas.getContext('2d');
+const wrap    = document.getElementById('grid-wrap');
+
+// ─────────────────────────────────────────────
+// CELL HELPERS
+// ─────────────────────────────────────────────
+const cellKey = (col, row) => `${col},${row}`;
+
+function getCell(col, row)   { return cells[cellKey(col, row)] || null; }
+function isActive(col, row)  { return !!cells[cellKey(col, row)]; }
+function inGrid(col, row)    { return col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS; }
+
+function activateCell(col, row) {
+  if (!inGrid(col, row)) return;
+  const k = cellKey(col, row);
+  if (!cells[k]) cells[k] = { background: 'hallway', borders: {n:false,s:false,e:false,w:false}, object: null, special: null };
+  autoBorders(col, row);
+}
+
+// Set each edge of a cell to wall if no active neighbor, clear it (and the neighbor's shared edge) if one exists.
+function autoBorders(col, row) {
+  const cell = getCell(col, row);
+  if (!cell) return;
+  for (const [dir, [dc, dr]] of Object.entries(DELTA)) {
+    const nb = getCell(col + dc, row + dr);
+    if (nb) {
+      cell.borders[dir] = false;
+      nb.borders[OPPOSITE[dir]] = false;
+    } else {
+      cell.borders[dir] = true;
+    }
+  }
+}
+
+function deactivateCell(col, row) {
+  const k = cellKey(col, row);
+  const cell = cells[k];
+  if (!cell) return;
+  if (cell.special === 'player')  playerStart = null;
+  if (cell.special === 'exit')    exitPos     = null;
+  if (cell.special === 'villain') villainPos  = null;
+  delete cells[k];
+  // Restore outer-edge wall on each exposed neighbor
+  for (const [dir, [dc, dr]] of Object.entries(DELTA)) {
+    const nb = getCell(col + dc, row + dr);
+    if (nb) nb.borders[OPPOSITE[dir]] = true;
+  }
+  if (selected && selected.col === col && selected.row === row) {
+    selected = null;
+    refreshSidebar();
+  }
+}
+
+function assignSpecial(col, row, type) {
+  const cell = getCell(col, row);
+  if (!cell) return;
+
+  const trackers = { player: () => playerStart, exit: () => exitPos, villain: () => villainPos };
+  const setters  = {
+    player:  v => playerStart = v,
+    exit:    v => exitPos     = v,
+    villain: v => villainPos  = v,
+  };
+
+  // Clear old holder of this type
+  const prev = trackers[type]();
+  if (prev) {
+    const old = getCell(prev[0], prev[1]);
+    if (old && old.special === type) old.special = null;
+  }
+
+  // Clear this cell's old special
+  if (cell.special && cell.special !== type) setters[cell.special](null);
+
+  // Toggle off if same type
+  if (cell.special === type) {
+    cell.special = null;
+    setters[type](null);
+  } else {
+    cell.special = type;
+    setters[type]([col, row]);
+  }
+}
+
+// ─────────────────────────────────────────────
+// COORDS
+// ─────────────────────────────────────────────
+function screenToCell(sx, sy) {
+  return { col: Math.floor((sx - panX) / cellSize), row: Math.floor((sy - panY) / cellSize) };
+}
+
+// ─────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────
+function render() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d0d1a';
+  ctx.fillRect(0, 0, W, H);
+
+  const c0 = Math.max(0, Math.floor(-panX / cellSize));
+  const r0 = Math.max(0, Math.floor(-panY / cellSize));
+  const c1 = Math.min(GRID_COLS - 1, Math.ceil((W - panX) / cellSize));
+  const r1 = Math.min(GRID_ROWS - 1, Math.ceil((H - panY) / cellSize));
+
+  // Inactive cell grid
+  ctx.strokeStyle = '#1c1c32';
+  ctx.lineWidth = 0.5;
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      if (isActive(c, r)) continue;
+      const x = c * cellSize + panX, y = r * cellSize + panY;
+      ctx.strokeRect(x + 0.5, y + 0.5, cellSize - 1, cellSize - 1);
+    }
+  }
+
+  // Active cells
+  for (const [key, cell] of Object.entries(cells)) {
+    const [col, row] = key.split(',').map(Number);
+    if (col < c0 || col > c1 || row < r0 || row > r1) continue;
+    drawCell(col, row, cell);
+  }
+
+  // Selection highlight
+  if (selected && inGrid(selected.col, selected.row)) {
+    const x = selected.col * cellSize + panX, y = selected.row * cellSize + panY;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+  }
+
+  // Grid boundary
+  ctx.strokeStyle = '#303058';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(panX, panY, GRID_COLS * cellSize, GRID_ROWS * cellSize);
+
+  refreshStatus();
+}
+
+function drawCell(col, row, cell) {
+  const x = col * cellSize + panX;
+  const y = row * cellSize + panY;
+  const s = cellSize;
+
+  // Background
+  const bg = bgCache[cell.background] || bgCache.empty;
+  ctx.drawImage(bg, x, y, s, s);
+
+  // Object tint
+  if (cell.object) {
+    ctx.fillStyle = OBJ_FILL[cell.object];
+    ctx.fillRect(x, y, s, s);
+  }
+
+  // Border walls
+  const bw = Math.max(2, Math.floor(s * 0.08));
+  ctx.strokeStyle = '#dd3333';
+  ctx.lineWidth = bw;
+  ctx.lineCap = 'square';
+  const o = bw / 2; // inset so stroke doesn't bleed outside cell
+  if (cell.borders.n) { ctx.beginPath(); ctx.moveTo(x,     y + o); ctx.lineTo(x + s, y + o); ctx.stroke(); }
+  if (cell.borders.s) { ctx.beginPath(); ctx.moveTo(x,     y + s - o); ctx.lineTo(x + s, y + s - o); ctx.stroke(); }
+  if (cell.borders.w) { ctx.beginPath(); ctx.moveTo(x + o, y); ctx.lineTo(x + o, y + s); ctx.stroke(); }
+  if (cell.borders.e) { ctx.beginPath(); ctx.moveTo(x + s - o, y); ctx.lineTo(x + s - o, y + s); ctx.stroke(); }
+
+  // Icons (only when cells are large enough to read)
+  if (s < 12) return;
+
+  const hasObj  = !!cell.object;
+  const hasSpec = !!cell.special;
+  const fontSize = Math.max(8, Math.floor(s * 0.42));
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `bold ${fontSize}px monospace`;
+
+  if (hasObj && hasSpec) {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText(OBJ_LABEL[cell.object],  x + s * 0.28, y + s * 0.32);
+    ctx.fillStyle = SPEC_COLOR[cell.special];
+    ctx.fillText(SPEC_LABEL[cell.special], x + s * 0.72, y + s * 0.68);
+  } else if (hasSpec) {
+    ctx.fillStyle = SPEC_COLOR[cell.special];
+    ctx.fillText(SPEC_LABEL[cell.special], x + s * 0.5, y + s * 0.5);
+  } else if (hasObj) {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText(OBJ_LABEL[cell.object], x + s * 0.5, y + s * 0.5);
+  }
+}
+
+// ─────────────────────────────────────────────
+// SIDEBAR
+// ─────────────────────────────────────────────
+function refreshSidebar() {
+  updateBgVisibility();
+  const noSel = document.getElementById('no-sel');
+  const editor = document.getElementById('cell-editor');
+  const cell = selected ? getCell(selected.col, selected.row) : null;
+
+  if (!cell) {
+    noSel.style.display = '';
+    editor.style.display = 'none';
+    return;
+  }
+
+  noSel.style.display = 'none';
+  editor.style.display = '';
+
+  document.getElementById('cell-title').textContent = `Cell [${selected.col}, ${selected.row}]`;
+  document.getElementById('bg-select').value = cell.background;
+  selectPaintBg(cell.background, /* updateCell */ false);
+  document.getElementById('obj-select').value = cell.object || '';
+
+  ['n','s','e','w'].forEach(d => {
+    document.getElementById('b-' + d).classList.toggle('active', !!cell.borders[d]);
+  });
+
+  document.getElementById('s-player').classList.toggle('active',  cell.special === 'player');
+  document.getElementById('s-exit').classList.toggle('active',    cell.special === 'exit');
+  document.getElementById('s-villain').classList.toggle('active', cell.special === 'villain');
+}
+
+function refreshStatus() {
+  const count = Object.keys(cells).length;
+  document.getElementById('status').textContent = `${count} cell${count !== 1 ? 's' : ''}`;
+
+  const msgs = [];
+  if (count === 0)  msgs.push('<span class="warn">⚠ No active cells</span>');
+  if (!playerStart) msgs.push('<span class="warn">⚠ No Jax start position</span>');
+  if (!exitPos)     msgs.push('<span class="warn">⚠ No exit</span>');
+  if (!villainPos)  msgs.push('<span class="warn">⚠ No Chandler position</span>');
+
+  const footer = document.getElementById('sidebar-footer');
+  footer.innerHTML = msgs.length
+    ? msgs.join('<br>')
+    : '<span class="ok">✓ Ready to export</span>';
+}
+
+// ─────────────────────────────────────────────
+// SIDEBAR EVENTS
+// ─────────────────────────────────────────────
+document.getElementById('bg-select').addEventListener('change', e => {
+  const cell = selected && getCell(selected.col, selected.row);
+  if (cell) { cell.background = e.target.value; render(); }
+});
+
+document.getElementById('obj-select').addEventListener('change', e => {
+  const cell = selected && getCell(selected.col, selected.row);
+  if (cell) { cell.object = e.target.value || null; render(); }
+});
+
+['n','s','e','w'].forEach(d => {
+  document.getElementById('b-' + d).addEventListener('click', () => {
+    const cell = selected && getCell(selected.col, selected.row);
+    if (!cell) return;
+    cell.borders[d] = !cell.borders[d];
+    document.getElementById('b-' + d).classList.toggle('active', cell.borders[d]);
+    render();
+  });
+});
+
+[['s-player','player'],['s-exit','exit'],['s-villain','villain']].forEach(([id, type]) => {
+  document.getElementById(id).addEventListener('click', () => {
+    if (!selected) return;
+    assignSpecial(selected.col, selected.row, type);
+    refreshSidebar();
+    render();
+  });
+});
+
+document.getElementById('btn-deactivate').addEventListener('click', () => {
+  if (selected) { deactivateCell(selected.col, selected.row); render(); }
+});
+
+// ─────────────────────────────────────────────
+// CANVAS INPUT
+// ─────────────────────────────────────────────
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('mousedown', e => {
+  // Alt+drag or middle-click → pan
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    isPanning = true;
+    panOrigin = { x: e.offsetX - panX, y: e.offsetY - panY };
+    e.preventDefault();
+    return;
+  }
+  if (e.button !== 0) return;
+
+  const { col, row } = screenToCell(e.offsetX, e.offsetY);
+  if (!inGrid(col, row)) return;
+
+  if (tool === 'select') {
+    selected = isActive(col, row) ? { col, row } : null;
+    refreshSidebar();
+    render();
+  } else if (tool === 'paint') {
+    isPainting = true;
+    lastPainted = { col, row };
+    activateCell(col, row);
+    getCell(col, row).background = paintBackground;
+    render();
+  } else if (tool === 'erase') {
+    isPainting = true;
+    lastPainted = { col, row };
+    deactivateCell(col, row);
+    render();
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (isPanning) {
+    panX = e.offsetX - panOrigin.x;
+    panY = e.offsetY - panOrigin.y;
+    render();
+    return;
+  }
+  if (!isPainting) return;
+
+  const { col, row } = screenToCell(e.offsetX, e.offsetY);
+  if (!inGrid(col, row)) return;
+  if (lastPainted && lastPainted.col === col && lastPainted.row === row) return;
+  lastPainted = { col, row };
+
+  if (tool === 'paint') {
+    activateCell(col, row);
+    getCell(col, row).background = paintBackground;
+    render();
+  }
+  else if (tool === 'erase') { deactivateCell(col, row); render(); }
+});
+
+canvas.addEventListener('mouseup',    () => { isPainting = false; isPanning = false; });
+canvas.addEventListener('mouseleave', () => { isPainting = false; isPanning = false; });
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const { col, row } = screenToCell(e.offsetX, e.offsetY);
+  const prev = zoomIdx;
+  if (e.deltaY < 0) zoomIdx = Math.min(zoomIdx + 1, ZOOM_LEVELS.length - 1);
+  else              zoomIdx = Math.max(zoomIdx - 1, 0);
+  if (zoomIdx === prev) return;
+  cellSize = ZOOM_LEVELS[zoomIdx];
+  panX = e.offsetX - col * cellSize;
+  panY = e.offsetY - row * cellSize;
+  document.getElementById('zoom-label').textContent = cellSize + 'px';
+  render();
+}, { passive: false });
+
+// ─────────────────────────────────────────────
+// TOOLBAR BUTTONS
+// ─────────────────────────────────────────────
+const TOOL_CURSORS = { select: 'default', paint: 'cell', erase: 'no-drop' };
+
+function buildBgSwatches() {
+  const LABELS = {
+    empty:'Empty', hallway:'Hallway', grass:'Grass', cafeteria:'Cafe',
+    carpet:'Carpet', dirt:'Dirt', concrete:'Concrete', asphalt:'Asphalt',
+  };
+  const container = document.getElementById('bg-swatches');
+  for (const key of Object.keys(BG_BASE)) {
+    const swatch = document.createElement('div');
+    swatch.className = 'bg-swatch' + (key === paintBackground ? ' active' : '');
+    swatch.dataset.bg = key;
+    swatch.title = LABELS[key];
+
+    const cvs = document.createElement('canvas');
+    cvs.width = 40; cvs.height = 40;
+    cvs.getContext('2d').drawImage(bgCache[key], 0, 0, 40, 40);
+
+    const lbl = document.createElement('span');
+    lbl.textContent = LABELS[key];
+
+    swatch.append(cvs, lbl);
+    swatch.addEventListener('click', () => selectPaintBg(key, true));
+    container.appendChild(swatch);
+  }
+}
+
+// updateCell=true → also apply to currently selected cell (swatch click)
+// updateCell=false → only sync highlight (cell selection)
+function selectPaintBg(bg, updateCell = true) {
+  paintBackground = bg;
+  document.querySelectorAll('.bg-swatch').forEach(s => s.classList.toggle('active', s.dataset.bg === bg));
+  if (updateCell) {
+    const cell = selected && getCell(selected.col, selected.row);
+    if (cell) {
+      cell.background = bg;
+      document.getElementById('bg-select').value = bg;
+      render();
+    }
+  }
+}
+
+function updateBgVisibility() {
+  const hide = tool === 'select' && !selected;
+  document.querySelector('#sidebar-scroll .field').style.display = hide ? 'none' : '';
+  document.querySelector('#sidebar-scroll .divider').style.display = hide ? 'none' : '';
+}
+
+['select','paint','erase'].forEach(t => {
+  document.getElementById('t-' + t).addEventListener('click', () => {
+    tool = t;
+    document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('active'));
+    document.getElementById('t-' + t).classList.add('active');
+    canvas.style.cursor = TOOL_CURSORS[t];
+    updateBgVisibility();
+  });
+});
+
+document.getElementById('zoom-in').addEventListener('click', () => {
+  if (zoomIdx < ZOOM_LEVELS.length - 1) {
+    zoomIdx++;
+    cellSize = ZOOM_LEVELS[zoomIdx];
+    document.getElementById('zoom-label').textContent = cellSize + 'px';
+    render();
+  }
+});
+
+document.getElementById('zoom-out').addEventListener('click', () => {
+  if (zoomIdx > 0) {
+    zoomIdx--;
+    cellSize = ZOOM_LEVELS[zoomIdx];
+    document.getElementById('zoom-label').textContent = cellSize + 'px';
+    render();
+  }
+});
+
+// ─────────────────────────────────────────────
+// KEYBOARD SHORTCUTS
+// ─────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target !== document.body) return; // don't intercept form inputs
+  const key = e.key.toLowerCase();
+  if (key === 's') document.getElementById('t-select').click();
+  if (key === 'p') document.getElementById('t-paint').click();
+  if (key === 'e') document.getElementById('t-erase').click();
+  if (key === '=' || key === '+') document.getElementById('zoom-in').click();
+  if (key === '-') document.getElementById('zoom-out').click();
+  if (key === 'arrowleft')  { panX += 64; render(); }
+  if (key === 'arrowright') { panX -= 64; render(); }
+  if (key === 'arrowup')    { panY += 64; render(); }
+  if (key === 'arrowdown')  { panY -= 64; render(); }
+});
+
+// ─────────────────────────────────────────────
+// FILE I/O
+// ─────────────────────────────────────────────
+document.getElementById('btn-export').addEventListener('click', () => {
+  const errors = [];
+  if (Object.keys(cells).length === 0) errors.push('No active cells.');
+  if (!playerStart) errors.push('No Jax start position.');
+  if (!exitPos)     errors.push('No exit position.');
+  if (!villainPos)  errors.push('No Chandler position.');
+  if (errors.length) { alert('Cannot export:\n\n' + errors.join('\n')); return; }
+
+  const data = {
+    version: MAP_VERSION,
+    playerStart,
+    exit: exitPos,
+    villain: villainPos,
+    cells: {},
+  };
+  for (const [k, cell] of Object.entries(cells)) {
+    data.cells[k] = {
+      background: cell.background,
+      borders:    { ...cell.borders },
+      object:     cell.object,
+      special:    cell.special,
+    };
+  }
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'chandlers-world-map.json';
+  a.click(); URL.revokeObjectURL(url);
+});
+
+document.getElementById('btn-load').addEventListener('click', () => {
+  document.getElementById('file-input').click();
+});
+
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try { loadMap(JSON.parse(ev.target.result)); }
+    catch (err) { alert('Could not parse JSON: ' + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+function loadMap(data) {
+  if (!data || !data.version) { alert('Invalid map file.'); return; }
+  if (data.version > MAP_VERSION) {
+    alert(`Map version ${data.version} is newer than this builder (v${MAP_VERSION}).`);
+    return;
+  }
+
+  cells = {}; playerStart = null; exitPos = null; villainPos = null; selected = null;
+
+  for (const [k, cd] of Object.entries(data.cells || {})) {
+    cells[k] = {
+      background: cd.background || 'empty',
+      borders:    { n:false, s:false, e:false, w:false, ...(cd.borders || {}) },
+      object:     cd.object  || null,
+      special:    cd.special || null,
+    };
+    const [col, row] = k.split(',').map(Number);
+    if (cd.special === 'player')  playerStart = [col, row];
+    if (cd.special === 'exit')    exitPos     = [col, row];
+    if (cd.special === 'villain') villainPos  = [col, row];
+  }
+
+  centerOnCells();
+  refreshSidebar();
+  render();
+}
+
+// ─────────────────────────────────────────────
+// NEW MAP
+// ─────────────────────────────────────────────
+document.getElementById('btn-new').addEventListener('click', () => {
+  if (Object.keys(cells).length > 0 && !confirm('Start a new map? Current work will be lost.')) return;
+  cells = {}; playerStart = null; exitPos = null; villainPos = null; selected = null;
+  centerOnGrid();
+  refreshSidebar();
+  render();
+});
+
+// ─────────────────────────────────────────────
+// PAN HELPERS
+// ─────────────────────────────────────────────
+function centerOnGrid() {
+  panX = canvas.width  / 2 - (GRID_COLS * cellSize) / 2;
+  panY = canvas.height / 2 - (GRID_ROWS * cellSize) / 2;
+}
+
+function centerOnCells() {
+  const keys = Object.keys(cells);
+  if (!keys.length) { centerOnGrid(); return; }
+  let minC = GRID_COLS, maxC = 0, minR = GRID_ROWS, maxR = 0;
+  for (const k of keys) {
+    const [c, r] = k.split(',').map(Number);
+    minC = Math.min(minC, c); maxC = Math.max(maxC, c);
+    minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+  }
+  panX = canvas.width  / 2 - ((minC + maxC) / 2 + 0.5) * cellSize;
+  panY = canvas.height / 2 - ((minR + maxR) / 2 + 0.5) * cellSize;
+}
+
+// ─────────────────────────────────────────────
+// RESIZE
+// ─────────────────────────────────────────────
+function resize() {
+  canvas.width  = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  render();
+}
+
+// ─────────────────────────────────────────────
+// TEMPLATES
+// ─────────────────────────────────────────────
+
+function buildMap(fn) {
+  const cells = {};
+  const get = (c, r) => {
+    const k = `${c},${r}`;
+    if (!cells[k]) cells[k] = { background:'hallway', borders:{n:false,s:false,e:false,w:false}, object:null, special:null };
+    return cells[k];
+  };
+  const fill = (c0, r0, w, h, bg) => {
+    for (let r = r0; r < r0+h; r++)
+      for (let c = c0; c < c0+w; c++) get(c,r).background = bg;
+  };
+  const outerWalls = (c0, r0, w, h) => {
+    for (let c = c0; c < c0+w; c++) {
+      get(c, r0).borders.n = true;
+      get(c, r0+h-1).borders.s = true;
+    }
+    for (let r = r0; r < r0+h; r++) {
+      get(c0, r).borders.w = true;
+      get(c0+w-1, r).borders.e = true;
+    }
+  };
+  const obj  = (c, r, type)  => { get(c,r).object  = type; };
+  const spec = (c, r, type)  => { get(c,r).special = type; };
+
+  fn({ fill, outerWalls, obj, spec });
+
+  let playerStart=null, exit=null, villain=null;
+  for (const [k,v] of Object.entries(cells)) {
+    const [c,r] = k.split(',').map(Number);
+    if (v.special==='player')  playerStart=[c,r];
+    if (v.special==='exit')    exit=[c,r];
+    if (v.special==='villain') villain=[c,r];
+  }
+  return { version:1, playerStart, exit, villain, cells };
+}
+
+const TEMPLATES = [
+  {
+    name: 'The Gauntlet',
+    desc: 'Hallway · 22×5 · Two vertical barriers force a zigzag dash. Chandler closes from the far end.',
+    data: buildMap(({ fill, outerWalls, obj, spec }) => {
+      fill(0,0, 22,5, 'hallway');
+      outerWalls(0,0, 22,5);
+      // Barrier 1 at col 7 — gap at row 4 (bottom)
+      for (let r = 0; r < 4; r++) obj(7, r, 'wall');
+      // Barrier 2 at col 14 — gap at row 0 (top)
+      for (let r = 1; r < 5; r++) obj(14, r, 'wall');
+      obj(3, 2, 'pushable'); obj(18, 2, 'pushable');
+      spec(1, 3, 'player'); spec(20, 1, 'exit'); spec(20, 3, 'villain');
+    }),
+  },
+  {
+    name: 'Open Field',
+    desc: 'Grass · 13×13 · Wide open space with a mud trap in the center and balls to use as shields.',
+    data: buildMap(({ fill, outerWalls, obj, spec }) => {
+      fill(0,0, 13,13, 'grass');
+      outerWalls(0,0, 13,13);
+      // Scattered pushable balls
+      obj(3,3,'pushable'); obj(9,3,'pushable');
+      obj(3,9,'pushable'); obj(9,9,'pushable');
+      obj(6,2,'pushable'); obj(6,10,'pushable');
+      // Central mud trap
+      for (let r=5;r<=7;r++) for (let c=5;c<=7;c++) obj(c,r,'mud');
+      spec(1,11,'player'); spec(11,1,'exit'); spec(11,11,'villain');
+    }),
+  },
+  {
+    name: 'Lunch Rush',
+    desc: 'Cafeteria · 14×10 · Three table rows create corridors. Chandler guards the exit from above.',
+    data: buildMap(({ fill, outerWalls, obj, spec }) => {
+      fill(0,0, 14,10, 'cafeteria');
+      outerWalls(0,0, 14,10);
+      // Table row 1 — left & right halves, gap in center (cols 5–8)
+      for (let c=1;c<=4;c++)   obj(c, 2, 'wall');
+      for (let c=9;c<=12;c++)  obj(c, 2, 'wall');
+      // Table row 2 — inner halves, gaps at sides
+      for (let c=3;c<=6;c++)   obj(c, 5, 'wall');
+      for (let c=7;c<=10;c++)  obj(c, 5, 'wall');
+      // Table row 3 — same pattern as row 1
+      for (let c=1;c<=4;c++)   obj(c, 8, 'wall');
+      for (let c=9;c<=12;c++)  obj(c, 8, 'wall');
+      // Mud spills between tables
+      obj(6,2,'mud'); obj(7,2,'mud');
+      obj(1,5,'mud'); obj(12,5,'mud');
+      obj(6,8,'mud'); obj(7,8,'mud');
+      spec(1,8,'player'); spec(12,1,'exit'); spec(7,1,'villain');
+    }),
+  },
+  {
+    name: 'Office Block',
+    desc: 'Carpet · 16×12 · Horizontal dividers with offset gaps create a winding path through the rooms.',
+    data: buildMap(({ fill, outerWalls, obj, spec }) => {
+      fill(0,0, 16,12, 'carpet');
+      outerWalls(0,0, 16,12);
+      // Divider row 3: cols 0–10, gap at cols 11–14
+      for (let c=0;c<=10;c++)  obj(c, 3, 'wall');
+      // Divider row 7: cols 5–15, gap at cols 0–4
+      for (let c=5;c<=15;c++)  obj(c, 7, 'wall');
+      // Pushable office chairs
+      obj(2,1,'pushable'); obj(8,1,'pushable');
+      obj(7,5,'pushable'); obj(12,5,'pushable');
+      obj(2,9,'pushable'); obj(13,9,'pushable');
+      spec(1,10,'player'); spec(14,1,'exit'); spec(12,2,'villain');
+    }),
+  },
+];
+
+function renderMinimap(data, cvs) {
+  const c = cvs.getContext('2d');
+  const keys = Object.keys(data.cells);
+  if (!keys.length) return;
+
+  let minC=60, maxC=0, minR=60, maxR=0;
+  for (const k of keys) {
+    const [col,row] = k.split(',').map(Number);
+    minC = Math.min(minC,col); maxC = Math.max(maxC,col);
+    minR = Math.min(minR,row); maxR = Math.max(maxR,row);
+  }
+  const cols = maxC - minC + 1, rows = maxR - minR + 1;
+  const pad = 4;
+  const cs = Math.min(
+    Math.floor((cvs.width  - pad*2) / cols),
+    Math.floor((cvs.height - pad*2) / rows),
+    14
+  );
+  const ox = Math.floor((cvs.width  - cols*cs) / 2);
+  const oy = Math.floor((cvs.height - rows*cs) / 2);
+
+  c.fillStyle = '#0d0d1a';
+  c.fillRect(0, 0, cvs.width, cvs.height);
+
+  for (const [k, cell] of Object.entries(data.cells)) {
+    const [col,row] = k.split(',').map(Number);
+    const x = ox + (col - minC) * cs, y = oy + (row - minR) * cs;
+
+    c.fillStyle = BG_BASE[cell.background] || BG_BASE.empty;
+    c.fillRect(x, y, cs, cs);
+
+    if (cell.object === 'wall')     { c.fillStyle='rgba(180,120,60,0.65)';  c.fillRect(x,y,cs,cs); }
+    if (cell.object === 'mud')      { c.fillStyle='rgba(80,65,20,0.70)';    c.fillRect(x,y,cs,cs); }
+    if (cell.object === 'pushable') { c.fillStyle='rgba(60,90,160,0.65)';   c.fillRect(x,y,cs,cs); }
+
+    if (cs >= 4) {
+      c.strokeStyle = '#cc3333'; c.lineWidth = Math.max(1, cs*0.14);
+      const o = c.lineWidth/2;
+      if (cell.borders.n) { c.beginPath(); c.moveTo(x,    y+o);    c.lineTo(x+cs, y+o);    c.stroke(); }
+      if (cell.borders.s) { c.beginPath(); c.moveTo(x,    y+cs-o); c.lineTo(x+cs, y+cs-o); c.stroke(); }
+      if (cell.borders.w) { c.beginPath(); c.moveTo(x+o,  y);      c.lineTo(x+o,  y+cs);   c.stroke(); }
+      if (cell.borders.e) { c.beginPath(); c.moveTo(x+cs-o,y);     c.lineTo(x+cs-o,y+cs);  c.stroke(); }
+    }
+
+    if (cell.special) {
+      const r = Math.max(2, cs*0.28);
+      c.fillStyle = SPEC_COLOR[cell.special];
+      c.beginPath(); c.arc(x+cs/2, y+cs/2, r, 0, Math.PI*2); c.fill();
+    }
+  }
+}
+
+function openTemplatesModal() {
+  const modal = document.getElementById('templates-modal');
+  const grid  = document.getElementById('template-cards');
+  grid.innerHTML = '';
+
+  TEMPLATES.forEach((tpl, idx) => {
+    const card = document.createElement('div');
+    card.className = 'tpl-card';
+
+    const cvs = document.createElement('canvas');
+    cvs.className = 'tpl-preview';
+    cvs.width  = 220;
+    cvs.height = 110;
+
+    const name = document.createElement('div');
+    name.className = 'tpl-name';
+    name.textContent = tpl.name;
+
+    const desc = document.createElement('div');
+    desc.className = 'tpl-desc';
+    desc.textContent = tpl.desc;
+
+    const btn = document.createElement('button');
+    btn.className = 'tpl-load';
+    btn.textContent = 'Load Map';
+    btn.addEventListener('click', () => loadTemplate(idx));
+
+    card.append(cvs, name, desc, btn);
+    grid.appendChild(card);
+
+    requestAnimationFrame(() => renderMinimap(tpl.data, cvs));
+  });
+
+  modal.style.display = 'flex';
+}
+
+function loadTemplate(idx) {
+  if (Object.keys(cells).length > 0 && !confirm('Load this template? Current work will be lost.')) return;
+  document.getElementById('templates-modal').style.display = 'none';
+  loadMap(TEMPLATES[idx].data);
+}
+
+document.getElementById('btn-templates').addEventListener('click', openTemplatesModal);
+document.getElementById('modal-close').addEventListener('click', () => {
+  document.getElementById('templates-modal').style.display = 'none';
+});
+document.getElementById('templates-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('templates-modal'))
+    document.getElementById('templates-modal').style.display = 'none';
+});
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+buildBgCache();
+buildBgSwatches();
+window.addEventListener('resize', resize);
+resize();         // sets canvas dimensions
+centerOnGrid();   // initial pan
+render();
+</script>
+</body>
+</html>
