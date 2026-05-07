@@ -55,6 +55,66 @@
     chandlerRed: '#e03040',
     mud:         '#5a4220',
     mudDark:     '#3a2810',
+    // ── New terrain ──
+    snow:        '#e8eef4',
+    snowDark:    '#c8d4e0',
+    snowBlue:    '#a8b8c8',
+    ice:         '#b8d8e8',
+    iceDark:     '#88b8d0',
+    iceShine:    '#e8f4fc',
+    sand:        '#e8d090',
+    sandDark:    '#c8b070',
+    sandShine:   '#f0dca0',
+    gravel:      '#888880',
+    gravelDark:  '#605850',
+    gravelLight: '#a8a098',
+    // ── New object palette ──
+    hedge:       '#3a6a30',
+    hedgeDark:   '#1f4820',
+    hedgeLight:  '#5a8a40',
+    bark:        '#6b4a2a',
+    barkDark:    '#3a2a18',
+    leaf:        '#4a8a3a',
+    rock:        '#888080',
+    rockDark:    '#585050',
+    rockLight:   '#b8b0a8',
+    snowmanBody: '#f8fcff',
+    snowmanShade:'#c8d4e0',
+    fenceWood:   '#a07848',
+    fenceWoodDark:'#6b4a2a',
+    metalGray:   '#909098',
+    metalDark:   '#484848',
+    metalLight:  '#c8c8d0',
+    porcelain:   '#f0f4f8',
+    porcelainShade:'#c8d0d8',
+    paperBoard:  '#d8b888',
+    paperBoardDark:'#a08858',
+    cork:        '#c89868',
+    corkDark:    '#80583a',
+    flagRed:     '#cc2020',
+    flagPole:    '#c8c8c8',
+    bookA:       '#7a3030',
+    bookB:       '#2a4a8b',
+    bookC:       '#3a6030',
+    bookD:       '#a06820',
+    basketball:  '#d87830',
+    basketballDark:'#883818',
+    dodgeball:   '#cc2020',
+    dodgeballDark:'#881010',
+    soccerWhite: '#f0f0f0',
+    soccerBlack: '#1a1a1a',
+    baseballWhite:'#f0e8d8',
+    baseballRed: '#cc2020',
+    cone:        '#f08020',
+    coneDark:    '#a04810',
+    fire:        '#ff8020',
+    fireBright:  '#ffd040',
+    fireDark:    '#cc3010',
+    ash:         '#3a2a1a',
+    flowerPink:  '#e890a8',
+    flowerYellow:'#f0d040',
+    flowerWhite: '#f8f0e8',
+    signWood:    '#9a6838',
   };
 
   // ── CHARACTER PALETTES (from the game) ──────
@@ -406,6 +466,78 @@
           c2.fillRect(x, y, 1, 1);
         }
         break;
+      case 'snow':
+        c2.fillStyle = PAL.snow; c2.fillRect(0, 0, SRC, SRC);
+        c2.fillStyle = PAL.snowDark;
+        for (let i = 0; i < 22; i++) {
+          const x = ((i * 13) % SRC), y = ((i * 19) % SRC);
+          c2.fillRect(x, y, 2, 1);
+        }
+        c2.fillStyle = PAL.snowBlue;
+        for (let i = 0; i < 10; i++) {
+          const x = ((i * 23 + 5) % SRC), y = ((i * 11 + 3) % SRC);
+          c2.fillRect(x, y, 1, 1);
+        }
+        c2.fillStyle = '#ffffff';
+        c2.fillRect(8, 4, 1, 1); c2.fillRect(7, 5, 1, 1); c2.fillRect(9, 5, 1, 1);
+        c2.fillRect(48, 22, 1, 1); c2.fillRect(47, 23, 1, 1); c2.fillRect(49, 23, 1, 1);
+        c2.fillRect(28, 50, 1, 1); c2.fillRect(27, 51, 1, 1); c2.fillRect(29, 51, 1, 1);
+        break;
+      case 'ice':
+        c2.fillStyle = PAL.ice; c2.fillRect(0, 0, SRC, SRC);
+        c2.fillStyle = PAL.iceShine;
+        for (let i = 0; i < SRC * 2; i += 18) {
+          for (let j = 0; j < 6; j++) {
+            c2.fillRect(i + j, j, 1, 1);
+          }
+        }
+        c2.fillStyle = PAL.iceDark;
+        { const crack1 = [[6,10],[10,12],[14,11],[18,14],[22,13],[26,16]];
+          for (const [x,y] of crack1) c2.fillRect(x, y, 1, 1); }
+        { const crack2 = [[36,38],[40,40],[44,39],[48,42],[52,41],[56,44]];
+          for (const [x,y] of crack2) c2.fillRect(x, y, 1, 1); }
+        { const crack3 = [[40,8],[42,12],[44,14],[46,18],[48,20]];
+          for (const [x,y] of crack3) c2.fillRect(x, y, 1, 1); }
+        break;
+      case 'sand':
+        c2.fillStyle = PAL.sand; c2.fillRect(0, 0, SRC, SRC);
+        c2.fillStyle = PAL.sandDark;
+        for (let y = 4; y < SRC; y += 12) {
+          for (let x = 0; x < SRC; x += 1) {
+            const w = Math.sin((x + y) * 0.5) * 1.5;
+            if (w > 0.3) c2.fillRect(x, y + Math.floor(w), 1, 1);
+          }
+        }
+        for (let i = 0; i < 20; i++) {
+          const x = ((i * 17) % SRC), y = ((i * 13 + 5) % SRC);
+          c2.fillRect(x, y, 1, 1);
+        }
+        c2.fillStyle = PAL.sandShine;
+        for (let i = 0; i < 14; i++) {
+          const x = ((i * 19 + 3) % SRC), y = ((i * 23 + 1) % SRC);
+          c2.fillRect(x, y, 1, 1);
+        }
+        break;
+      case 'gravel':
+        c2.fillStyle = PAL.gravel; c2.fillRect(0, 0, SRC, SRC);
+        { const pebbles = [
+            [4,5,3,2], [12,3,2,2], [18,7,3,2], [25,4,2,3], [32,6,3,2],
+            [40,3,2,2], [48,7,3,2], [54,4,3,2],
+            [3,16,2,3], [10,18,3,2], [16,15,2,2], [22,19,3,2], [30,17,2,3],
+            [37,15,3,2], [45,18,2,2], [52,16,3,3],
+            [6,28,3,2], [14,30,2,2], [21,28,3,3], [28,31,2,2], [35,28,3,2],
+            [42,30,2,3], [50,29,3,2], [56,31,2,2],
+            [4,42,2,3], [12,44,3,2], [19,41,2,2], [26,43,3,3], [33,41,2,2],
+            [41,44,3,2], [48,42,2,3], [55,44,3,2],
+            [8,55,3,2], [16,57,2,2], [24,54,3,3], [32,56,2,2], [40,55,3,2],
+            [47,57,2,2], [54,54,3,3],
+          ];
+          c2.fillStyle = PAL.gravelDark;
+          for (const [x,y,w,h] of pebbles) c2.fillRect(x, y, w, h);
+          c2.fillStyle = PAL.gravelLight;
+          for (const [x,y,w,h] of pebbles) c2.fillRect(x, y, w, 1);
+        }
+        break;
       default:
         c2.fillStyle = '#444'; c2.fillRect(0, 0, SRC, SRC);
     }
@@ -718,6 +850,501 @@
     P(11, 0, 1, 1, 'rgba(255,255,255,0.4)');
   }
 
+  // ── EXTENDED OBJECT SPRITES ─────────────────
+  function _grid(ctx, x, y, s) {
+    ctx.imageSmoothingEnabled = false;
+    const u = s / 16;
+    return (px_, py_, w, h, color) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(x + px_*u, y + py_*u, Math.max(1, w*u), Math.max(1, h*u));
+    };
+  }
+
+  function drawHedge(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(0, 0, 16, 16, PAL.hedgeDark);
+    P(1, 1, 14, 14, PAL.hedge);
+    const highs = [[2,2],[5,1],[9,2],[12,1],[3,5],[7,4],[11,5],[14,3],
+                   [2,8],[6,7],[10,8],[13,7],[3,11],[7,11],[11,11],[14,11]];
+    for (const [a,b] of highs) P(a, b, 2, 2, PAL.hedgeLight);
+    const dims = [[4,3],[8,5],[12,4],[5,9],[9,9],[13,10],[5,13],[10,13]];
+    for (const [a,b] of dims) P(a, b, 1, 1, PAL.hedgeDark);
+    P(1, 1, 14, 1, PAL.hedgeLight);
+  }
+
+  function drawBush(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(4, 13, 8, 1, 'rgba(0,0,0,0.30)');
+    P(4, 5, 8, 8, PAL.hedgeDark);
+    P(3, 7, 1, 4, PAL.hedgeDark);
+    P(12, 7, 1, 4, PAL.hedgeDark);
+    P(5, 4, 6, 1, PAL.hedgeDark);
+    P(5, 6, 6, 6, PAL.hedge);
+    P(5, 6, 2, 2, PAL.hedgeLight);
+    P(9, 6, 2, 2, PAL.hedgeLight);
+    P(7, 8, 2, 2, PAL.hedgeLight);
+    P(5, 10, 2, 2, PAL.hedge);
+    P(8, 7, 1, 1, '#cc4040');
+    P(6, 10, 1, 1, '#cc4040');
+  }
+
+  function drawFence(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(0, 14, 16, 1, 'rgba(0,0,0,0.25)');
+    P(0, 5, 16, 2, PAL.fenceWood);
+    P(0, 11, 16, 2, PAL.fenceWood);
+    P(0, 5, 16, 1, PAL.wallTop);
+    P(0, 11, 16, 1, PAL.wallTop);
+    const pickets = [1, 5, 9, 13];
+    for (const px of pickets) {
+      P(px, 1, 2, 13, PAL.fenceWood);
+      P(px, 1, 1, 13, PAL.wallTop);
+      P(px+1, 1, 1, 1, PAL.wallTop);
+      P(px, 1, 2, 1, PAL.fenceWoodDark);
+      P(px+1, 0, 1, 1, PAL.fenceWood);
+    }
+    P(0, 7, 16, 1, PAL.fenceWoodDark);
+    P(0, 13, 16, 1, PAL.fenceWoodDark);
+  }
+
+  function drawStump(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(2, 14, 12, 1, 'rgba(0,0,0,0.30)');
+    P(2, 4, 12, 11, PAL.barkDark);
+    P(3, 5, 10, 9, PAL.bark);
+    P(2, 6, 1, 7, PAL.barkDark);
+    P(13, 6, 1, 7, PAL.barkDark);
+    P(4, 13, 8, 1, PAL.barkDark);
+    P(3, 3, 10, 4, '#c89868');
+    P(2, 4, 1, 2, '#c89868');
+    P(13, 4, 1, 2, '#c89868');
+    P(4, 2, 8, 1, '#c89868');
+    P(5, 4, 6, 2, '#a07848');
+    P(6, 4, 4, 2, PAL.bark);
+    P(7, 5, 2, 1, '#80583a');
+    P(4, 3, 8, 1, '#e0b078');
+  }
+
+  function drawRock(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(2, 14, 12, 1, 'rgba(0,0,0,0.30)');
+    P(3, 6, 10, 8, PAL.rockDark);
+    P(2, 8, 12, 5, PAL.rockDark);
+    P(4, 4, 8, 2, PAL.rockDark);
+    P(4, 7, 8, 6, PAL.rock);
+    P(3, 9, 10, 3, PAL.rock);
+    P(5, 5, 6, 2, PAL.rock);
+    P(5, 5, 4, 1, PAL.rockLight);
+    P(4, 6, 2, 1, PAL.rockLight);
+    P(7, 7, 2, 1, PAL.rockLight);
+    P(8, 9, 1, 3, PAL.rockDark);
+    P(9, 11, 1, 1, PAL.rockDark);
+  }
+
+  function drawSnowman(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(3, 14, 10, 1, 'rgba(0,0,0,0.30)');
+    P(4, 9, 8, 5, PAL.snowmanBody);
+    P(3, 10, 10, 3, PAL.snowmanBody);
+    P(4, 13, 8, 1, PAL.snowmanShade);
+    P(11, 10, 1, 3, PAL.snowmanShade);
+    P(5, 3, 6, 5, PAL.snowmanBody);
+    P(4, 4, 8, 3, PAL.snowmanBody);
+    P(10, 5, 1, 2, PAL.snowmanShade);
+    P(6, 5, 1, 1, '#1a1a1a');
+    P(9, 5, 1, 1, '#1a1a1a');
+    P(7, 6, 2, 1, PAL.cone);
+    P(9, 6, 1, 1, PAL.coneDark);
+    P(7, 7, 1, 1, '#1a1a1a');
+    P(8, 7, 1, 1, '#1a1a1a');
+    P(4, 1, 8, 1, '#1a1a1a');
+    P(5, 0, 6, 2, '#1a1a1a');
+    P(5, 1, 6, 1, PAL.flagRed);
+    P(7, 10, 1, 1, '#1a1a1a');
+    P(7, 12, 1, 1, '#1a1a1a');
+    P(2, 10, 2, 1, PAL.barkDark);
+    P(12, 10, 2, 1, PAL.barkDark);
+    P(1, 11, 1, 1, PAL.barkDark);
+    P(14, 9, 1, 1, PAL.barkDark);
+  }
+
+  function drawBarrel(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(3, 14, 10, 1, 'rgba(0,0,0,0.30)');
+    P(3, 3, 10, 11, PAL.bark);
+    P(2, 5, 1, 7, PAL.bark);
+    P(13, 5, 1, 7, PAL.bark);
+    P(3, 4, 10, 1, PAL.barkDark);
+    P(3, 13, 10, 1, PAL.barkDark);
+    P(5, 3, 1, 11, PAL.barkDark);
+    P(8, 3, 1, 11, PAL.barkDark);
+    P(11, 3, 1, 11, PAL.barkDark);
+    P(2, 5, 12, 1, PAL.metalGray);
+    P(2, 11, 12, 1, PAL.metalGray);
+    P(2, 5, 12, 1, PAL.metalLight);
+    P(4, 2, 8, 2, PAL.barkDark);
+    P(5, 3, 6, 1, '#3a2818');
+    P(3, 3, 1, 10, PAL.wallTop);
+  }
+
+  function drawCrate(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(2, 14, 12, 1, 'rgba(0,0,0,0.30)');
+    P(2, 3, 12, 11, PAL.bark);
+    P(2, 3, 12, 1, PAL.wallTop);
+    P(2, 3, 1, 11, PAL.wallTop);
+    P(2, 13, 12, 1, PAL.barkDark);
+    P(13, 3, 1, 11, PAL.barkDark);
+    P(2, 7, 12, 1, PAL.barkDark);
+    P(2, 11, 12, 1, PAL.barkDark);
+    P(3, 4, 1, 1, PAL.barkDark); P(4, 5, 1, 1, PAL.barkDark);
+    P(5, 6, 1, 1, PAL.barkDark); P(6, 7, 1, 1, PAL.barkDark);
+    P(12, 4, 1, 1, PAL.barkDark); P(11, 5, 1, 1, PAL.barkDark);
+    P(10, 6, 1, 1, PAL.barkDark); P(9, 7, 1, 1, PAL.barkDark);
+    P(3, 3, 1, 1, PAL.metalLight); P(12, 3, 1, 1, PAL.metalLight);
+    P(3, 13, 1, 1, PAL.metalDark); P(12, 13, 1, 1, PAL.metalDark);
+  }
+
+  function drawBackpack(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(3, 14, 10, 1, 'rgba(0,0,0,0.30)');
+    P(4, 4, 8, 10, PAL.flagRed);
+    P(3, 6, 1, 7, PAL.flagRed);
+    P(12, 6, 1, 7, PAL.flagRed);
+    P(5, 3, 6, 1, PAL.flagRed);
+    P(11, 4, 1, 10, '#881010');
+    P(4, 13, 8, 1, '#881010');
+    P(5, 5, 6, 4, '#a01818');
+    P(5, 5, 6, 1, '#cc2020');
+    P(7, 2, 2, 2, PAL.barkDark);
+    P(7, 2, 2, 1, PAL.bark);
+    P(6, 9, 4, 3, '#881010');
+    P(6, 9, 4, 1, '#cc2020');
+    P(7, 10, 2, 1, PAL.metalLight);
+    P(5, 6, 6, 1, PAL.metalGray);
+    P(4, 4, 7, 1, '#ee4040');
+  }
+
+  function drawToilet(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(3, 14, 10, 1, 'rgba(0,0,0,0.30)');
+    P(4, 2, 8, 5, PAL.porcelain);
+    P(4, 6, 8, 1, PAL.porcelainShade);
+    P(11, 3, 1, 4, PAL.porcelainShade);
+    P(4, 2, 8, 1, '#ffffff');
+    P(3, 7, 10, 6, PAL.porcelain);
+    P(2, 9, 1, 3, PAL.porcelain);
+    P(13, 9, 1, 3, PAL.porcelain);
+    P(3, 12, 10, 1, PAL.porcelainShade);
+    P(12, 8, 1, 4, PAL.porcelainShade);
+    P(5, 9, 6, 3, '#88b8d0');
+    P(5, 9, 6, 1, '#a8d4e8');
+    P(5, 13, 6, 1, PAL.porcelainShade);
+    P(11, 4, 2, 1, PAL.metalGray);
+    P(12, 4, 1, 1, PAL.metalDark);
+  }
+
+  function drawSink(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(2, 14, 12, 1, 'rgba(0,0,0,0.30)');
+    P(2, 5, 12, 9, PAL.porcelain);
+    P(13, 5, 1, 9, PAL.porcelainShade);
+    P(2, 13, 12, 1, PAL.porcelainShade);
+    P(2, 5, 12, 1, '#ffffff');
+    P(4, 7, 8, 5, '#b8c4d0');
+    P(4, 7, 8, 1, '#90a0b0');
+    P(4, 7, 1, 5, '#a0b0c0');
+    P(11, 7, 1, 5, '#90a0b0');
+    P(7, 10, 2, 1, '#484848');
+    P(7, 3, 2, 2, PAL.metalGray);
+    P(7, 3, 2, 1, PAL.metalLight);
+    P(8, 4, 1, 2, PAL.metalGray);
+    P(8, 6, 2, 1, PAL.metalGray);
+    P(9, 7, 1, 1, '#a8d4e8');
+  }
+
+  function drawFlag(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(3, 14, 10, 1, 'rgba(0,0,0,0.20)');
+    P(2, 1, 1, 14, PAL.flagPole);
+    P(3, 1, 1, 14, '#888');
+    P(2, 0, 2, 1, '#f0d040');
+    P(4, 2, 9, 6, PAL.flagRed);
+    P(4, 3, 9, 1, '#ffffff');
+    P(4, 5, 9, 1, '#ffffff');
+    P(4, 7, 9, 1, '#ffffff');
+    P(4, 2, 4, 3, '#2a4a8b');
+    P(5, 3, 1, 1, '#ffffff');
+    P(7, 3, 1, 1, '#ffffff');
+    P(11, 2, 2, 6, '#881010');
+    P(12, 3, 1, 4, '#cc2020');
+  }
+
+  function drawTrashcan(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(3, 14, 10, 1, 'rgba(0,0,0,0.30)');
+    P(4, 4, 8, 10, PAL.metalGray);
+    P(5, 5, 1, 9, PAL.metalDark);
+    P(7, 5, 1, 9, PAL.metalDark);
+    P(9, 5, 1, 9, PAL.metalDark);
+    P(11, 5, 1, 9, PAL.metalDark);
+    P(4, 4, 1, 10, PAL.metalLight);
+    P(11, 4, 1, 10, PAL.metalDark);
+    P(3, 2, 10, 2, PAL.metalDark);
+    P(3, 2, 10, 1, PAL.metalGray);
+    P(7, 1, 2, 1, PAL.metalDark);
+    P(7, 8, 2, 2, '#3aaa55');
+  }
+
+  function drawFountain(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(3, 14, 10, 1, 'rgba(0,0,0,0.30)');
+    P(3, 1, 10, 4, PAL.metalGray);
+    P(3, 1, 10, 1, PAL.metalLight);
+    P(2, 5, 12, 5, PAL.porcelain);
+    P(2, 5, 12, 1, '#ffffff');
+    P(13, 5, 1, 5, PAL.porcelainShade);
+    P(2, 9, 12, 1, PAL.porcelainShade);
+    P(4, 6, 8, 3, '#b8c4d0');
+    P(7, 4, 2, 2, PAL.metalGray);
+    P(7, 4, 2, 1, PAL.metalLight);
+    P(7, 6, 1, 1, '#a8d4e8');
+    P(8, 6, 1, 1, '#a8d4e8');
+    P(9, 7, 1, 1, '#a8d4e8');
+    P(5, 10, 6, 4, PAL.metalGray);
+    P(5, 10, 1, 4, PAL.metalLight);
+    P(10, 10, 1, 4, PAL.metalDark);
+    P(5, 2, 1, 1, '#cc2020');
+    P(11, 2, 1, 1, '#3aaa55');
+  }
+
+  // Top-down view. Back wall is the top edge (2 rows thick) so rotation
+  // reads as the back facing whichever direction the user rotates to.
+  function drawBookshelf(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(1, 1, 14, 14, PAL.deskSide);
+    P(1, 1, 14, 2, PAL.deskTop);
+    P(1, 14, 14, 1, PAL.deskTop);
+    P(1, 2, 1, 12, PAL.deskTop);
+    P(14, 2, 1, 12, PAL.deskTop);
+
+    P(2, 3, 1, 11, PAL.bookA);
+    P(3, 3, 2, 11, PAL.bookB);
+    P(5, 3, 1, 11, PAL.bookC);
+    P(6, 3, 1, 11, PAL.bookD);
+    P(7, 3, 2, 11, PAL.bookA);
+    P(9, 3, 1, 11, PAL.bookC);
+    P(10, 3, 1, 11, PAL.bookB);
+    P(11, 3, 1, 11, PAL.bookD);
+    P(12, 3, 1, 11, PAL.bookA);
+    P(13, 3, 1, 11, PAL.bookC);
+  }
+
+  function drawBulletinboard(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(1, 2, 14, 12, PAL.barkDark);
+    P(2, 3, 12, 10, PAL.cork);
+    const specks = [[3,4],[6,5],[9,4],[12,5],[4,7],[8,7],[11,8],[3,10],[7,10],[10,11],[13,9]];
+    for (const [a,b] of specks) P(a, b, 1, 1, PAL.corkDark);
+    P(3, 4, 4, 4, '#f0e8d8');
+    P(3, 4, 4, 1, '#c8b888');
+    P(4, 5, 2, 1, PAL.corkDark);
+    P(4, 6, 3, 1, PAL.corkDark);
+    P(8, 5, 4, 5, PAL.flowerYellow);
+    P(8, 5, 4, 1, '#a08820');
+    P(9, 7, 2, 1, PAL.barkDark);
+    P(5, 4, 1, 1, PAL.flagRed);
+    P(10, 5, 1, 1, PAL.flagRed);
+    P(4, 10, 5, 2, '#f0e8d8');
+    P(6, 10, 1, 1, PAL.flagRed);
+    P(1, 2, 14, 1, PAL.bark);
+    P(1, 2, 1, 12, PAL.bark);
+  }
+
+  function drawBasketball(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(4, 13, 8, 1, 'rgba(0,0,0,0.30)');
+    P(5, 4, 6, 8, PAL.basketball);
+    P(4, 5, 8, 6, PAL.basketball);
+    P(6, 3, 4, 1, PAL.basketball);
+    P(6, 12, 4, 1, PAL.basketball);
+    P(10, 6, 1, 4, PAL.basketballDark);
+    P(5, 11, 6, 1, PAL.basketballDark);
+    P(5, 4, 3, 1, '#ffa050');
+    P(5, 5, 1, 1, '#ffa050');
+    P(7, 3, 1, 10, PAL.basketballDark);
+    P(8, 3, 1, 10, PAL.basketballDark);
+    P(4, 7, 8, 1, PAL.basketballDark);
+    P(5, 5, 1, 1, PAL.basketballDark);
+    P(10, 5, 1, 1, PAL.basketballDark);
+    P(5, 10, 1, 1, PAL.basketballDark);
+    P(10, 10, 1, 1, PAL.basketballDark);
+  }
+
+  function drawHurdle(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(2, 14, 12, 1, 'rgba(0,0,0,0.30)');
+    P(2, 6, 1, 8, PAL.metalDark);
+    P(3, 7, 1, 7, PAL.metalDark);
+    P(13, 6, 1, 8, PAL.metalDark);
+    P(12, 7, 1, 7, PAL.metalDark);
+    P(1, 13, 4, 1, PAL.metalGray);
+    P(11, 13, 4, 1, PAL.metalGray);
+    P(2, 4, 12, 2, '#ffffff');
+    P(2, 4, 12, 1, '#cccccc');
+    P(3, 4, 2, 2, PAL.flagRed);
+    P(7, 4, 2, 2, PAL.flagRed);
+    P(11, 4, 2, 2, PAL.flagRed);
+    P(2, 4, 12, 1, '#ffe8e8');
+  }
+
+  function drawDodgeball(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(4, 13, 8, 1, 'rgba(0,0,0,0.30)');
+    P(5, 4, 6, 8, PAL.dodgeball);
+    P(4, 5, 8, 6, PAL.dodgeball);
+    P(6, 3, 4, 1, PAL.dodgeball);
+    P(6, 12, 4, 1, PAL.dodgeball);
+    P(10, 6, 1, 4, PAL.dodgeballDark);
+    P(5, 11, 6, 1, PAL.dodgeballDark);
+    P(6, 4, 2, 1, '#ee5050');
+    P(5, 5, 1, 2, '#ee5050');
+    P(7, 5, 1, 1, '#ffffff');
+  }
+
+  function drawSoccerball(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(4, 13, 8, 1, 'rgba(0,0,0,0.30)');
+    P(5, 4, 6, 8, PAL.soccerWhite);
+    P(4, 5, 8, 6, PAL.soccerWhite);
+    P(6, 3, 4, 1, PAL.soccerWhite);
+    P(6, 12, 4, 1, PAL.soccerWhite);
+    P(7, 6, 2, 2, PAL.soccerBlack);
+    P(5, 5, 1, 1, PAL.soccerBlack); P(10, 5, 1, 1, PAL.soccerBlack);
+    P(5, 10, 1, 1, PAL.soccerBlack); P(10, 10, 1, 1, PAL.soccerBlack);
+    P(7, 4, 1, 1, PAL.soccerBlack); P(8, 4, 1, 1, PAL.soccerBlack);
+    P(7, 11, 2, 1, PAL.soccerBlack);
+    P(4, 7, 1, 2, PAL.soccerBlack); P(11, 7, 1, 2, PAL.soccerBlack);
+    P(10, 9, 1, 2, '#cccccc');
+    P(6, 11, 4, 1, '#cccccc');
+  }
+
+  function drawBaseball(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(5, 13, 6, 1, 'rgba(0,0,0,0.30)');
+    P(6, 5, 4, 6, PAL.baseballWhite);
+    P(5, 6, 6, 4, PAL.baseballWhite);
+    P(7, 4, 2, 1, PAL.baseballWhite);
+    P(7, 11, 2, 1, PAL.baseballWhite);
+    P(9, 7, 1, 3, '#c8c0b0');
+    P(6, 10, 4, 1, '#c8c0b0');
+    P(5, 7, 1, 1, PAL.baseballRed); P(6, 5, 1, 1, PAL.baseballRed);
+    P(8, 5, 1, 1, PAL.baseballRed); P(10, 7, 1, 1, PAL.baseballRed);
+    P(10, 9, 1, 1, PAL.baseballRed); P(8, 10, 1, 1, PAL.baseballRed);
+    P(6, 10, 1, 1, PAL.baseballRed); P(5, 8, 1, 1, PAL.baseballRed);
+    P(7, 6, 1, 1, '#ffffff');
+  }
+
+  function drawCone(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(3, 14, 10, 1, 'rgba(0,0,0,0.30)');
+    P(3, 13, 10, 2, PAL.coneDark);
+    P(3, 13, 10, 1, PAL.cone);
+    P(7, 3, 2, 1, PAL.cone);
+    P(6, 4, 4, 2, PAL.cone);
+    P(5, 6, 6, 2, PAL.cone);
+    P(5, 8, 6, 2, PAL.cone);
+    P(4, 10, 8, 3, PAL.cone);
+    P(9, 4, 1, 1, PAL.coneDark);
+    P(9, 6, 1, 4, PAL.coneDark);
+    P(10, 10, 1, 3, PAL.coneDark);
+    P(5, 8, 6, 1, '#ffffff');
+    P(5, 11, 7, 1, '#ffffff');
+    P(7, 3, 1, 1, '#ffa050');
+    P(6, 4, 1, 2, '#ffa050');
+    P(5, 6, 1, 2, '#ffa050');
+  }
+
+  function drawSportsbag(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(2, 14, 12, 1, 'rgba(0,0,0,0.30)');
+    P(3, 6, 10, 7, '#2a4a8b');
+    P(2, 7, 12, 5, '#2a4a8b');
+    P(2, 8, 1, 3, '#1a3a6b');
+    P(13, 8, 1, 3, '#1a3a6b');
+    P(3, 12, 10, 1, '#1a3a6b');
+    P(3, 6, 10, 1, '#3a5a9b');
+    P(2, 7, 12, 1, '#3a5a9b');
+    P(3, 8, 10, 1, PAL.metalGray);
+    P(8, 8, 1, 2, PAL.metalDark);
+    P(6, 4, 1, 3, PAL.barkDark);
+    P(9, 4, 1, 3, PAL.barkDark);
+    P(6, 4, 4, 1, PAL.barkDark);
+    P(7, 5, 2, 1, PAL.bark);
+    P(2, 10, 12, 1, '#cc2020');
+    P(11, 9, 1, 1, '#ffffff');
+  }
+
+  function drawFlowerpatch(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(2, 12, 1, 2, PAL.hedgeDark); P(5, 13, 1, 2, PAL.hedgeDark);
+    P(10, 13, 1, 2, PAL.hedgeDark); P(13, 12, 1, 2, PAL.hedgeDark);
+    P(3, 8, 1, 5, PAL.hedge); P(7, 6, 1, 7, PAL.hedge);
+    P(11, 8, 1, 5, PAL.hedge); P(5, 10, 1, 3, PAL.hedge);
+    P(13, 9, 1, 4, PAL.hedge);
+    P(4, 10, 1, 1, PAL.hedgeLight);
+    P(8, 9, 1, 1, PAL.hedgeLight);
+    P(10, 10, 1, 1, PAL.hedgeLight);
+    P(2, 7, 3, 2, PAL.flowerPink);
+    P(3, 6, 1, 1, PAL.flowerPink);
+    P(3, 7, 1, 1, PAL.flowerYellow);
+    P(6, 4, 3, 3, PAL.flowerYellow);
+    P(7, 3, 1, 1, PAL.flowerYellow);
+    P(7, 5, 1, 1, '#cc8000');
+    P(10, 6, 3, 2, PAL.flowerWhite);
+    P(11, 5, 1, 1, PAL.flowerWhite);
+    P(11, 6, 1, 1, PAL.flowerYellow);
+    P(5, 11, 1, 1, PAL.flowerPink);
+  }
+
+  function drawSign(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(5, 14, 6, 1, 'rgba(0,0,0,0.30)');
+    P(7, 6, 2, 9, PAL.signWood);
+    P(7, 6, 1, 9, PAL.bark);
+    P(8, 6, 1, 9, PAL.barkDark);
+    P(2, 2, 11, 4, PAL.signWood);
+    P(13, 3, 1, 2, PAL.signWood);
+    P(2, 2, 11, 1, '#c08858');
+    P(2, 5, 12, 1, PAL.barkDark);
+    P(3, 3, 6, 1, PAL.barkDark);
+    P(3, 4, 4, 1, PAL.barkDark);
+    P(3, 2, 1, 1, PAL.metalLight);
+    P(11, 2, 1, 1, PAL.metalLight);
+    P(5, 13, 6, 2, PAL.dirtDark);
+  }
+
+  function drawCampfire(ctx, x, y, s) {
+    const P = _grid(ctx, x, y, s);
+    P(2, 14, 12, 1, 'rgba(0,0,0,0.30)');
+    P(3, 12, 2, 2, PAL.rock); P(11, 12, 2, 2, PAL.rock);
+    P(6, 13, 4, 1, PAL.rock);
+    P(3, 12, 2, 1, PAL.rockLight); P(11, 12, 2, 1, PAL.rockLight);
+    P(3, 10, 10, 1, PAL.bark);
+    P(2, 11, 12, 1, PAL.barkDark);
+    P(4, 9, 8, 1, PAL.bark);
+    P(2, 10, 1, 2, PAL.barkDark); P(13, 10, 1, 2, PAL.barkDark);
+    P(5, 11, 6, 1, PAL.ash);
+    P(6, 6, 4, 4, PAL.fireDark);
+    P(5, 7, 1, 3, PAL.fireDark); P(10, 7, 1, 3, PAL.fireDark);
+    P(7, 5, 2, 1, PAL.fireDark);
+    P(6, 7, 4, 3, PAL.fire); P(7, 6, 2, 1, PAL.fire);
+    P(7, 8, 2, 2, PAL.fireBright); P(7, 7, 1, 1, PAL.fireBright);
+    P(5, 4, 1, 1, PAL.fireBright);
+    P(11, 5, 1, 1, PAL.fire);
+    P(8, 3, 1, 1, PAL.fireBright);
+  }
+
   // ── PUBLIC API ──────────────────────────────
   window.Sprites = {
     PAL, JAX_PAL, CHA_PAL,
@@ -727,5 +1354,10 @@
     drawBrickEdge, drawWall, drawPushable, drawMud,
     drawLocker, drawDesk, drawDoor, drawBlackboard,
     drawExit, drawGel, drawMirror, drawSpray,
+    drawHedge, drawBush, drawFence, drawStump, drawRock, drawSnowman,
+    drawBarrel, drawCrate, drawBackpack, drawToilet, drawSink, drawFlag,
+    drawTrashcan, drawFountain, drawBookshelf, drawBulletinboard,
+    drawBasketball, drawHurdle, drawDodgeball, drawSoccerball, drawBaseball,
+    drawCone, drawSportsbag, drawFlowerpatch, drawSign, drawCampfire,
   };
 })();

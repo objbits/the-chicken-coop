@@ -7,6 +7,40 @@
 
 const MAP_VERSION = 2;
 
+// Themed replacement for native alert(). Returns a promise that resolves
+// when the user dismisses the modal, so callers can await if needed.
+function showAlert(message, title = 'Notice') {
+  return new Promise(resolve => {
+    const modal   = document.getElementById('alert-modal');
+    const titleEl = document.getElementById('alert-title');
+    const body    = document.getElementById('alert-body');
+    const okBtn   = document.getElementById('alert-ok');
+    const closeBtn = document.getElementById('alert-close');
+
+    titleEl.textContent = '★ ' + String(title).toUpperCase();
+    body.textContent    = String(message);
+    modal.style.display = 'flex';
+    setTimeout(() => okBtn.focus(), 0);
+
+    function close() {
+      modal.style.display = 'none';
+      okBtn.removeEventListener('click', close);
+      closeBtn.removeEventListener('click', close);
+      modal.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKey);
+      resolve();
+    }
+    function onBackdrop(e) { if (e.target === modal) close(); }
+    function onKey(e) {
+      if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); close(); }
+    }
+    okBtn.addEventListener('click', close);
+    closeBtn.addEventListener('click', close);
+    modal.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+  });
+}
+
 const VILLAIN_DEFS = {
   chandler:     { label: 'CHANDLER',     color: '#e03040', defaultSpeed: 0.9 },
   bigw:         { label: 'BIG W',        color: '#8030e0', defaultSpeed: 0.75 },
@@ -25,12 +59,14 @@ const ZOOM_LEVELS = [8, 12, 16, 20, 28, 40, 56];
 
 const BG_KEYS = [
   'empty', 'hallway', 'classroom', 'cafeteria', 'carpet',
-  'grass', 'dirt', 'concrete', 'asphalt'
+  'grass', 'dirt', 'concrete', 'asphalt',
+  'snow', 'ice', 'sand', 'gravel',
 ];
 const BG_LABELS = {
   empty: 'Void', hallway: 'Hallway', classroom: 'Class', cafeteria: 'Cafe',
   carpet: 'Carpet', grass: 'Grass', dirt: 'Dirt',
   concrete: 'Concrete', asphalt: 'Asphalt',
+  snow: 'Snow', ice: 'Ice', sand: 'Sand', gravel: 'Gravel',
 };
 
 // Object kinds — game properties + how to render the icon.
@@ -43,8 +79,41 @@ const OBJ_DEFS = {
   desk:        { label: 'Desk',     kind: 'immovable', draw: 'desk' },
   door:        { label: 'Door',     kind: 'passable',  draw: 'door' },
   blackboard:  { label: 'Board',    kind: 'immovable', draw: 'blackboard' },
+  // Extras
+  hedge:       { label: 'Hedge',    kind: 'immovable', draw: 'hedge' },
+  bush:        { label: 'Bush',     kind: 'immovable', draw: 'bush' },
+  fence:       { label: 'Fence',    kind: 'immovable', draw: 'fence' },
+  stump:       { label: 'Stump',    kind: 'immovable', draw: 'stump' },
+  rock:        { label: 'Rock',     kind: 'immovable', draw: 'rock' },
+  snowman:     { label: 'Snowman',  kind: 'immovable', draw: 'snowman' },
+  barrel:      { label: 'Barrel',   kind: 'immovable', draw: 'barrel' },
+  crate:       { label: 'Crate',    kind: 'immovable', draw: 'crate' },
+  backpack:    { label: 'Backpack', kind: 'passable',  draw: 'backpack' },
+  toilet:      { label: 'Toilet',   kind: 'immovable', draw: 'toilet' },
+  sink:        { label: 'Sink',     kind: 'immovable', draw: 'sink' },
+  flag:        { label: 'Flag',     kind: 'immovable', draw: 'flag' },
+  trashcan:    { label: 'Trash',    kind: 'immovable', draw: 'trashcan' },
+  fountain:    { label: 'Fountain', kind: 'immovable', draw: 'fountain' },
+  bookshelf:   { label: 'Bookshelf',kind: 'immovable', draw: 'bookshelf' },
+  bulletinboard:{ label: 'Bulletin',kind: 'immovable', draw: 'bulletinboard' },
+  basketball:  { label: 'B-ball',   kind: 'movable',   draw: 'basketball' },
+  hurdle:      { label: 'Hurdle',   kind: 'immovable', draw: 'hurdle' },
+  dodgeball:   { label: 'D-ball',   kind: 'movable',   draw: 'dodgeball' },
+  soccerball:  { label: 'Soccer',   kind: 'movable',   draw: 'soccerball' },
+  baseball:    { label: 'Baseball', kind: 'movable',   draw: 'baseball' },
+  cone:        { label: 'Cone',     kind: 'immovable', draw: 'cone' },
+  sportsbag:   { label: 'Bag',      kind: 'immovable', draw: 'sportsbag' },
+  flowerpatch: { label: 'Flowers',  kind: 'passable',  draw: 'flowerpatch' },
+  sign:        { label: 'Sign',     kind: 'immovable', draw: 'sign' },
+  campfire:    { label: 'Campfire', kind: 'immovable', draw: 'campfire' },
 };
 const OBJ_ORDER = ['wall', 'pushable', 'mud', 'locker', 'desk', 'door', 'blackboard'];
+const EXTRAS_ORDER = [
+  'hedge', 'bush', 'fence', 'stump', 'rock', 'snowman', 'barrel', 'crate',
+  'backpack', 'toilet', 'sink', 'flag', 'trashcan', 'fountain', 'bookshelf', 'bulletinboard',
+  'basketball', 'hurdle', 'dodgeball', 'soccerball', 'baseball', 'cone', 'sportsbag',
+  'flowerpatch', 'sign', 'campfire',
+];
 
 // Specials — player, exit, and pickups. Villains are tracked separately.
 const SPECIAL_DEFS = {
@@ -75,7 +144,7 @@ let selected    = null;
 let zoomIdx   = 2;
 let cellSize  = ZOOM_LEVELS[zoomIdx];
 let panX = 0, panY = 0;
-let tool            = 'select';
+let tool            = 'bg';
 let paintBackground = 'hallway';
 let penSize         = 1;
 let viewMode        = 'builder';   // 'builder' | 'game'
@@ -84,6 +153,8 @@ let isPainting  = false;
 let isPanning   = false;
 let panOrigin   = null;
 let lastPainted = null;
+let hoverCell   = null;
+let eraseMode   = 'all'; // 'all' | 'objects'
 
 // Cached tile patterns (64×64 source canvases)
 const tileCache = {};
@@ -146,6 +217,21 @@ function deactivateCell(col, row) {
     selected = null;
     refreshSidebar();
   }
+}
+
+function clearCellObjects(col, row) {
+  const cell = getCell(col, row);
+  if (!cell) return;
+  if (cell.special && specials[cell.special]
+      && specials[cell.special][0] === col
+      && specials[cell.special][1] === row) {
+    specials[cell.special] = null;
+  }
+  cell.special = null;
+  cell.object = null;
+  cell.rotation = 0;
+  villainsPlaced = villainsPlaced.filter(v => !(v.col === col && v.row === row));
+  if (selected && selected.col === col && selected.row === row) refreshSidebar();
 }
 
 function assignSpecial(col, row, type) {
@@ -280,6 +366,16 @@ function render() {
   // Villain placement overlay (on top of specials)
   drawVillainsOverlay(c0, r0, c1, r1);
 
+  // Select hover highlight
+  if (viewMode === 'builder' && tool === 'select' && hoverCell && inGrid(hoverCell.col, hoverCell.row) && isActive(hoverCell.col, hoverCell.row)) {
+    const x = hoverCell.col * cellSize + panX, y = hoverCell.row * cellSize + panY;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.fillRect(x, y, cellSize, cellSize);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x + 0.75, y + 0.75, cellSize - 1.5, cellSize - 1.5);
+  }
+
   // Selection highlight (builder mode only)
   if (viewMode === 'builder' && tool === 'select' && selected && inGrid(selected.col, selected.row)) {
     const x = selected.col * cellSize + panX, y = selected.row * cellSize + panY;
@@ -295,6 +391,54 @@ function render() {
     ctx.strokeRect(x + 0.5, y + 0.5, cellSize - 1, cellSize - 1);
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
+  }
+
+  // BG hover preview
+  if (viewMode === 'builder' && tool === 'bg' && hoverCell && inGrid(hoverCell.col, hoverCell.row)) {
+    const offset = Math.floor((penSize - 1) / 2);
+    const tile = tileCache[paintBackground] || tileCache.empty;
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.imageSmoothingEnabled = false;
+    for (let dr = 0; dr < penSize; dr++) {
+      for (let dc = 0; dc < penSize; dc++) {
+        const c = hoverCell.col - offset + dc, r = hoverCell.row - offset + dr;
+        if (!inGrid(c, r)) continue;
+        ctx.drawImage(tile, c * cellSize + panX, r * cellSize + panY, cellSize, cellSize);
+      }
+    }
+    ctx.restore();
+    const x = (hoverCell.col - offset) * cellSize + panX;
+    const y = (hoverCell.row - offset) * cellSize + panY;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, penSize * cellSize - 2, penSize * cellSize - 2);
+  }
+
+  // Objects hover preview
+  if (viewMode === 'builder' && tool === 'objects' && hoverCell && inGrid(hoverCell.col, hoverCell.row) && isActive(hoverCell.col, hoverCell.row)) {
+    const x = hoverCell.col * cellSize + panX, y = hoverCell.row * cellSize + panY;
+    if (selectedObjectItem.kind === 'object') {
+      drawCellObject(hoverCell.col, hoverCell.row, { object: selectedObjectItem.type, rotation: paintRotation }, 0.55);
+    }
+    ctx.strokeStyle = 'rgba(100, 180, 255, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+  }
+
+  // Quick Build placement ghost
+  if (viewMode === 'builder' && placingQB && hoverCell && inGrid(hoverCell.col, hoverCell.row)) {
+    drawQuickBuildGhost(placingQB, hoverCell.col, hoverCell.row);
+  }
+
+  // Erase hover highlight
+  if (viewMode === 'builder' && tool === 'erase' && hoverCell && inGrid(hoverCell.col, hoverCell.row)) {
+    const x = hoverCell.col * cellSize + panX, y = hoverCell.row * cellSize + panY;
+    ctx.fillStyle = 'rgba(204, 32, 32, 0.35)';
+    ctx.fillRect(x, y, cellSize, cellSize);
+    ctx.strokeStyle = '#cc2020';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
   }
 
   // Grid boundary (builder mode only)
@@ -326,34 +470,66 @@ function drawCellBorders(col, row, cell) {
   }
 }
 
-function drawCellObject(col, row, cell) {
+const OBJ_DRAW_FNS = {
+  wall: () => window.MB_drawWall,
+  chair: () => window.MB_drawPushable,
+  mud: () => window.MB_drawMud,
+  locker: () => window.MB_drawLocker,
+  desk: () => window.MB_drawDesk,
+  door: () => window.MB_drawDoor,
+  blackboard: () => window.MB_drawBlackboard,
+  hedge: () => window.MB_drawHedge,
+  bush: () => window.MB_drawBush,
+  fence: () => window.MB_drawFence,
+  stump: () => window.MB_drawStump,
+  rock: () => window.MB_drawRock,
+  snowman: () => window.MB_drawSnowman,
+  barrel: () => window.MB_drawBarrel,
+  crate: () => window.MB_drawCrate,
+  backpack: () => window.MB_drawBackpack,
+  toilet: () => window.MB_drawToilet,
+  sink: () => window.MB_drawSink,
+  flag: () => window.MB_drawFlag,
+  trashcan: () => window.MB_drawTrashcan,
+  fountain: () => window.MB_drawFountain,
+  bookshelf: () => window.MB_drawBookshelf,
+  bulletinboard: () => window.MB_drawBulletinboard,
+  basketball: () => window.MB_drawBasketball,
+  hurdle: () => window.MB_drawHurdle,
+  dodgeball: () => window.MB_drawDodgeball,
+  soccerball: () => window.MB_drawSoccerball,
+  baseball: () => window.MB_drawBaseball,
+  cone: () => window.MB_drawCone,
+  sportsbag: () => window.MB_drawSportsbag,
+  flowerpatch: () => window.MB_drawFlowerpatch,
+  sign: () => window.MB_drawSign,
+  campfire: () => window.MB_drawCampfire,
+};
+
+function drawCellObject(col, row, cell, alpha = 1) {
   if (!cell.object) return;
   const def = OBJ_DEFS[cell.object];
   if (!def) return;
+  const drawFnGetter = OBJ_DRAW_FNS[def.draw];
+  if (!drawFnGetter) return;
+  const drawFn = drawFnGetter();
+  if (!drawFn) return;
+
   const x = col * cellSize + panX;
   const y = row * cellSize + panY;
   const s = cellSize;
-  const drawFn = {
-    wall: window.MB_drawWall,
-    chair: window.MB_drawPushable,
-    mud: window.MB_drawMud,
-    locker: window.MB_drawLocker,
-    desk: window.MB_drawDesk,
-    door: window.MB_drawDoor,
-    blackboard: window.MB_drawBlackboard,
-  }[def.draw];
-  if (!drawFn) return;
-
   const rot = cell.rotation || 0;
-  if (rot === 0) {
-    drawFn(ctx, x, y, s);
-  } else {
-    ctx.save();
+
+  ctx.save();
+  if (alpha !== 1) ctx.globalAlpha = alpha;
+  if (rot !== 0) {
     ctx.translate(x + s / 2, y + s / 2);
     ctx.rotate(rot * Math.PI / 180);
     drawFn(ctx, -s / 2, -s / 2, s);
-    ctx.restore();
+  } else {
+    drawFn(ctx, x, y, s);
   }
+  ctx.restore();
 }
 
 function drawCellSpecial(col, row, cell) {
@@ -412,6 +588,32 @@ function drawCellSpecial(col, row, cell) {
   }
 }
 
+function drawVillainInCell(ctx, x, y, s, type, frame, facing, stunned) {
+  const sprite = window.VILLAIN_SPRITES && window.VILLAIN_SPRITES[type];
+  if (!sprite) {
+    Sprites.drawChandlerInCell(ctx, x, y, s, frame, facing, stunned);
+    return;
+  }
+  const ps = s / 23;
+  const drawnW = 17 * ps;
+  const ox = x + (s - drawnW) / 2;
+  sprite.draw(ctx, ox, y, frame || 0, facing == null ? 1 : facing, !!stunned, ps);
+}
+
+function makeVillainSwatchRenderer(type) {
+  return (c2, x, y, s) => {
+    const def = VILLAIN_DEFS[type];
+    if (def) {
+      c2.save();
+      c2.globalAlpha = 0.3;
+      c2.fillStyle = def.color;
+      c2.fillRect(x, y, s, s);
+      c2.restore();
+    }
+    drawVillainInCell(c2, x, y, s, type, 0, 1, false);
+  };
+}
+
 function drawVillainsOverlay(c0, r0, c1, r1) {
   for (const v of villainsPlaced) {
     if (v.col < c0 || v.col > c1 || v.row < r0 || v.row > r1) continue;
@@ -428,7 +630,7 @@ function drawVillainsOverlay(c0, r0, c1, r1) {
       ctx.fillRect(x, y, s, s);
       ctx.restore();
     }
-    Sprites.drawChandlerInCell(ctx, x, y, s, 0, 1, false);
+    drawVillainInCell(ctx, x, y, s, v.type, 0, 1, false);
     if (viewMode === 'builder' && s >= 16) {
       ctx.fillStyle = def.color;
       ctx.strokeStyle = '#000';
@@ -448,6 +650,8 @@ function drawVillainsOverlay(c0, r0, c1, r1) {
 function refreshSidebar() {
   updateBgVisibility();
   updateObjectsPaletteVisibility();
+  updatePenSizeVisibility();
+  updateEraseModeVisibility();
   const noSel = document.getElementById('no-sel');
   const editor = document.getElementById('cell-editor');
   const ctxPanel = document.getElementById('context-panel');
@@ -487,6 +691,7 @@ function refreshSidebar() {
 
 function refreshStatus() {
   const count = Object.keys(cells).length;
+  updateToolAvailability();
   document.getElementById('status').textContent = `${count} CELL${count !== 1 ? 'S' : ''}`;
 
   const msgs = [];
@@ -525,6 +730,13 @@ canvas.addEventListener('mousedown', e => {
 
   const { col, row } = screenToCell(e.offsetX, e.offsetY);
   if (!inGrid(col, row)) return;
+
+  // Quick-build click-to-stamp mode: any left-click stamps and exits.
+  if (placingQB && !draggingQB) {
+    stampQuickBuild(placingQB, col, row);
+    cancelPlaceMode();
+    return;
+  }
 
   if (tool === 'objects') {
     if (!isActive(col, row)) return;
@@ -566,7 +778,7 @@ canvas.addEventListener('mousedown', e => {
   } else if (tool === 'erase') {
     isPainting = true;
     lastPainted = { col, row };
-    deactivateCell(col, row);
+    eraseMode === 'objects' ? clearCellObjects(col, row) : deactivateCell(col, row);
     render();
   }
 });
@@ -578,6 +790,18 @@ canvas.addEventListener('mousemove', e => {
     render();
     return;
   }
+
+  if (placingQB || tool === 'erase' || tool === 'objects' || tool === 'bg' || tool === 'select') {
+    const { col, row } = screenToCell(e.offsetX, e.offsetY);
+    const inside = inGrid(col, row);
+    const prev = hoverCell;
+    hoverCell = inside ? { col, row } : null;
+    const moved = !prev !== !hoverCell || (hoverCell && prev && (hoverCell.col !== prev.col || hoverCell.row !== prev.row));
+    if (!isPainting && moved) render();
+  } else {
+    hoverCell = null;
+  }
+
   if (!isPainting) return;
 
   const { col, row } = screenToCell(e.offsetX, e.offsetY);
@@ -589,7 +813,7 @@ canvas.addEventListener('mousemove', e => {
     paintBrush(col, row);
     render();
   } else if (tool === 'erase') {
-    deactivateCell(col, row);
+    eraseMode === 'objects' ? clearCellObjects(col, row) : deactivateCell(col, row);
     render();
   } else if (tool === 'objects') {
     if (!isActive(col, row)) return;
@@ -628,6 +852,7 @@ canvas.addEventListener('mouseup', () => {
 canvas.addEventListener('mouseleave', () => {
   isPainting = false;
   isPanning = false;
+  if (hoverCell) { hoverCell = null; render(); }
 });
 
 canvas.addEventListener('wheel', e => {
@@ -648,25 +873,10 @@ canvas.addEventListener('wheel', e => {
 // ─────────────────────────────────────────────
 // TOOLBAR BUTTONS
 // ─────────────────────────────────────────────
-const TOOL_CURSORS = { select: 'default', bg: 'cell', objects: 'crosshair', erase: 'no-drop' };
+const TOOL_CURSORS = { select: 'default', bg: 'default', objects: 'default', erase: 'no-drop' };
 
 function setCanvasCursor() {
-  if (tool === 'bg') {
-    const total = cellSize * penSize;
-    const size  = Math.min(total, 128);
-    const tile  = size / penSize;
-    const tmp   = document.createElement('canvas');
-    tmp.width = size; tmp.height = size;
-    const tc = tmp.getContext('2d');
-    tc.imageSmoothingEnabled = false;
-    for (let r = 0; r < penSize; r++)
-      for (let c = 0; c < penSize; c++)
-        tc.drawImage(tileCache[paintBackground], c * tile, r * tile, tile, tile);
-    const half = Math.floor(size / 2);
-    canvas.style.cursor = `url(${tmp.toDataURL()}) ${half} ${half}, cell`;
-  } else {
-    canvas.style.cursor = TOOL_CURSORS[tool];
-  }
+  canvas.style.cursor = TOOL_CURSORS[tool] || 'default';
 }
 
 function buildBgSwatches() {
@@ -736,6 +946,23 @@ function updatePenSizeVisibility() {
   const show = tool === 'bg';
   document.getElementById('pen-size-row').style.display = show ? 'flex' : 'none';
   document.getElementById('pen-size-sep').style.display = show ? ''    : 'none';
+}
+
+function updateToolAvailability() {
+  const hasCells = Object.keys(cells).length > 0;
+  for (const id of ['t-select', 't-objects', 't-erase']) {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = !hasCells;
+  }
+  if (!hasCells && tool !== 'bg') {
+    document.getElementById('t-bg').click();
+  }
+}
+
+function updateEraseModeVisibility() {
+  const show = tool === 'erase';
+  document.getElementById('erase-mode-row').style.display = show ? 'flex' : 'none';
+  document.getElementById('erase-mode-sep').style.display = show ? ''    : 'none';
 }
 
 function updateObjectsPaletteVisibility() {
@@ -837,6 +1064,25 @@ function renderObjTabContent() {
       const def = OBJ_DEFS[key];
       addObjSwatch(content, 'object', key, def.label.toUpperCase(), drawFns[def.draw], { placeItem: true });
     }
+  } else if (activeObjTab === 'extras') {
+    content.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:5px;';
+    const drawFns = {
+      hedge: window.MB_drawHedge, bush: window.MB_drawBush, fence: window.MB_drawFence,
+      stump: window.MB_drawStump, rock: window.MB_drawRock, snowman: window.MB_drawSnowman,
+      barrel: window.MB_drawBarrel, crate: window.MB_drawCrate, backpack: window.MB_drawBackpack,
+      toilet: window.MB_drawToilet, sink: window.MB_drawSink, flag: window.MB_drawFlag,
+      trashcan: window.MB_drawTrashcan, fountain: window.MB_drawFountain,
+      bookshelf: window.MB_drawBookshelf, bulletinboard: window.MB_drawBulletinboard,
+      basketball: window.MB_drawBasketball, hurdle: window.MB_drawHurdle,
+      dodgeball: window.MB_drawDodgeball, soccerball: window.MB_drawSoccerball,
+      baseball: window.MB_drawBaseball, cone: window.MB_drawCone,
+      sportsbag: window.MB_drawSportsbag, flowerpatch: window.MB_drawFlowerpatch,
+      sign: window.MB_drawSign, campfire: window.MB_drawCampfire,
+    };
+    for (const key of EXTRAS_ORDER) {
+      const def = OBJ_DEFS[key];
+      addObjSwatch(content, 'object', key, def.label.toUpperCase(), drawFns[def.draw], { placeItem: true });
+    }
   } else if (activeObjTab === 'specials') {
     content.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:5px;';
     const drawFns = {
@@ -851,18 +1097,9 @@ function renderObjTabContent() {
       addObjSwatch(content, 'special', key, labels[key], drawFns[key], { placeItem: true });
     }
   } else if (activeObjTab === 'villains') {
-    content.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+    content.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:5px;';
     for (const key of VILLAIN_KEYS) {
-      const def = VILLAIN_DEFS[key];
-      const btn = document.createElement('button');
-      btn.className = 'villain-type-btn obj-place-item';
-      btn.dataset.kind = 'villain';
-      btn.dataset.type = key;
-      btn.style.borderColor = def.color;
-      btn.style.color = def.color;
-      btn.textContent = def.label;
-      btn.addEventListener('click', () => handlePaletteClick('villain', key));
-      content.appendChild(btn);
+      addObjSwatch(content, 'villain', key, VILLAIN_DEFS[key].label, makeVillainSwatchRenderer(key), { placeItem: true });
     }
   }
 
@@ -910,6 +1147,17 @@ function filterObjPalette(query) {
     wall: window.MB_drawWall, chair: window.MB_drawPushable, mud: window.MB_drawMud,
     locker: window.MB_drawLocker, desk: window.MB_drawDesk, door: window.MB_drawDoor,
     blackboard: window.MB_drawBlackboard,
+    hedge: window.MB_drawHedge, bush: window.MB_drawBush, fence: window.MB_drawFence,
+    stump: window.MB_drawStump, rock: window.MB_drawRock, snowman: window.MB_drawSnowman,
+    barrel: window.MB_drawBarrel, crate: window.MB_drawCrate, backpack: window.MB_drawBackpack,
+    toilet: window.MB_drawToilet, sink: window.MB_drawSink, flag: window.MB_drawFlag,
+    trashcan: window.MB_drawTrashcan, fountain: window.MB_drawFountain,
+    bookshelf: window.MB_drawBookshelf, bulletinboard: window.MB_drawBulletinboard,
+    basketball: window.MB_drawBasketball, hurdle: window.MB_drawHurdle,
+    dodgeball: window.MB_drawDodgeball, soccerball: window.MB_drawSoccerball,
+    baseball: window.MB_drawBaseball, cone: window.MB_drawCone,
+    sportsbag: window.MB_drawSportsbag, flowerpatch: window.MB_drawFlowerpatch,
+    sign: window.MB_drawSign, campfire: window.MB_drawCampfire,
   };
   const specDrawFns = {
     player: (c, x, y, s) => Sprites.drawJaxInCell(c, x, y, s, 0, 1),
@@ -932,21 +1180,10 @@ function filterObjPalette(query) {
 
   const villainMatches = VILLAIN_KEYS.filter(k => VILLAIN_DEFS[k].label.toLowerCase().includes(q));
   if (villainMatches.length) {
-    const list = document.createElement('div');
-    list.style.cssText = 'display:flex;flex-direction:column;gap:4px;' + (swatchGrid.children.length ? 'margin-top:8px;' : '');
     for (const key of villainMatches) {
-      const def = VILLAIN_DEFS[key];
-      const btn = document.createElement('button');
-      btn.className = 'villain-type-btn obj-place-item';
-      btn.dataset.kind = 'villain';
-      btn.dataset.type = key;
-      btn.style.borderColor = def.color;
-      btn.style.color = def.color;
-      btn.textContent = def.label;
-      btn.addEventListener('click', () => handlePaletteClick('villain', key));
-      list.appendChild(btn);
+      addObjSwatch(swatchGrid, 'villain', key, VILLAIN_DEFS[key].label, makeVillainSwatchRenderer(key), { placeItem: true });
     }
-    content.appendChild(list);
+    if (!content.contains(swatchGrid)) content.appendChild(swatchGrid);
   }
 
   if (!swatchGrid.children.length && !villainMatches.length) {
@@ -982,7 +1219,7 @@ function buildObjectsPalette() {
   // Tab bar
   const tabBar = document.createElement('div');
   tabBar.id = 'obj-tab-bar';
-  for (const [id, label] of [['basic','BASIC'],['specials','SPECIALS'],['villains','VILLAINS']]) {
+  for (const [id, label] of [['basic','BASIC'],['extras','EXTRAS'],['specials','SPECIALS'],['villains','VILLAINS']]) {
     const btn = document.createElement('button');
     btn.className = 'obj-tab' + (id === activeObjTab ? ' active' : '');
     btn.dataset.tab = id;
@@ -1015,11 +1252,17 @@ function buildObjectsPalette() {
   const btn = document.getElementById('t-' + t);
   if (!btn) return;
   btn.addEventListener('click', () => {
+    if (btn.disabled) return;
     tool = t;
     if (t !== 'objects') objCtxPos = null;
+    if (!['objects','bg','erase','select'].includes(t) && hoverCell) { hoverCell = null; render(); }
+    if (t === 'objects' && selectedObjectItem.kind === 'none') {
+      selectedObjectItem = { kind: 'object', type: OBJ_ORDER[0] };
+    }
     document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     updatePenSizeVisibility();
+    updateEraseModeVisibility();
     updateObjectsPaletteVisibility();
     setCanvasCursor();
     refreshSidebar();
@@ -1032,6 +1275,14 @@ document.querySelectorAll('.pen-size-btn').forEach(btn => {
     document.querySelectorAll('.pen-size-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     setCanvasCursor();
+  });
+});
+
+document.querySelectorAll('.erase-mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    eraseMode = btn.dataset.mode;
+    document.querySelectorAll('.erase-mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
   });
 });
 
@@ -1071,8 +1322,17 @@ document.getElementById('zoom-out').addEventListener('click', () => {
 // KEYBOARD SHORTCUTS
 // ─────────────────────────────────────────────
 document.addEventListener('keydown', e => {
+  // ESC cancels Quick Build placing mode (always, even from inputs)
+  if (e.key === 'Escape' && placingQB) { cancelPlaceMode(); return; }
   if (e.target !== document.body) return;
   const key = e.key.toLowerCase();
+  // Dev shortcut: Ctrl/Cmd+Shift+Q opens "save current map as Quick Build".
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'q') {
+    if (!isQuickBuildDevEnv()) return;
+    e.preventDefault();
+    openSaveQBModal();
+    return;
+  }
   if (key === 's') document.getElementById('t-select').click();
   if (key === 'b') document.getElementById('t-bg').click();
   if (key === 'o') document.getElementById('t-objects').click();
@@ -1136,7 +1396,7 @@ function buildMapData() {
 
 document.getElementById('btn-export').addEventListener('click', () => {
   const errors = validateMap();
-  if (errors.length) { alert('Cannot export:\n\n' + errors.join('\n')); return; }
+  if (errors.length) { showAlert('Cannot export:\n\n' + errors.join('\n'), 'Cannot Export'); return; }
 
   const data = buildMapData();
   const slug = (data.name || 'map').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -1159,16 +1419,16 @@ document.getElementById('file-input').addEventListener('change', e => {
     try {
       resetDraftState();
       loadMap(JSON.parse(ev.target.result));
-    } catch (err) { alert('Could not parse JSON: ' + err.message); }
+    } catch (err) { showAlert('Could not parse JSON: ' + err.message, 'Load Failed'); }
   };
   reader.readAsText(file);
   e.target.value = '';
 });
 
 function loadMap(data) {
-  if (!data || !data.version) { alert('Invalid map file.'); return; }
+  if (!data || !data.version) { showAlert('Invalid map file.', 'Load Failed'); return; }
   if (data.version > MAP_VERSION) {
-    alert(`Map version ${data.version} is newer than this builder (v${MAP_VERSION}).`);
+    showAlert(`Map version ${data.version} is newer than this builder (v${MAP_VERSION}).`, 'Load Failed');
     return;
   }
 
@@ -1181,6 +1441,7 @@ function loadMap(data) {
   document.getElementById('meta-name').value   = data.name        || '';
   document.getElementById('meta-author').value = data.author      || '';
   document.getElementById('meta-desc').value   = data.description || '';
+  updateMapNameDisplay();
 
   for (const [k, cd] of Object.entries(data.cells || {})) {
     const special = (cd.special && cd.special !== 'villain') ? cd.special : null;
@@ -1226,6 +1487,7 @@ document.getElementById('btn-new').addEventListener('click', () => {
   document.getElementById('meta-name').value   = '';
   document.getElementById('meta-author').value = '';
   document.getElementById('meta-desc').value   = '';
+  updateMapNameDisplay();
   resetDraftState();
   centerOnGrid();
   refreshSidebar();
@@ -1496,6 +1758,17 @@ function renderMinimap(data, cvs) {
       desk: window.MB_drawDesk,
       door: window.MB_drawDoor,
       blackboard: window.MB_drawBlackboard,
+      hedge: window.MB_drawHedge, bush: window.MB_drawBush, fence: window.MB_drawFence,
+      stump: window.MB_drawStump, rock: window.MB_drawRock, snowman: window.MB_drawSnowman,
+      barrel: window.MB_drawBarrel, crate: window.MB_drawCrate, backpack: window.MB_drawBackpack,
+      toilet: window.MB_drawToilet, sink: window.MB_drawSink, flag: window.MB_drawFlag,
+      trashcan: window.MB_drawTrashcan, fountain: window.MB_drawFountain,
+      bookshelf: window.MB_drawBookshelf, bulletinboard: window.MB_drawBulletinboard,
+      basketball: window.MB_drawBasketball, hurdle: window.MB_drawHurdle,
+      dodgeball: window.MB_drawDodgeball, soccerball: window.MB_drawSoccerball,
+      baseball: window.MB_drawBaseball, cone: window.MB_drawCone,
+      sportsbag: window.MB_drawSportsbag, flowerpatch: window.MB_drawFlowerpatch,
+      sign: window.MB_drawSign, campfire: window.MB_drawCampfire,
     }[def.draw];
     if (drawFn) drawFn(c, x, y, cs);
   }
@@ -1516,7 +1789,7 @@ function renderMinimap(data, cvs) {
   // Villains
   for (const v of (data.villains || [])) {
     const x = ox + (v.col - minC) * cs, y = oy + (v.row - minR) * cs;
-    Sprites.drawChandlerInCell(c, x, y, cs, 0, 1, false);
+    drawVillainInCell(c, x, y, cs, v.type, 0, 1, false);
   }
 }
 
@@ -1564,18 +1837,76 @@ function loadTemplate(idx) {
 }
 
 // ── Map Info Modal ──
-document.getElementById('btn-level-info').addEventListener('click', () => {
+function updateMapNameDisplay() {
+  const name = document.getElementById('meta-name').value.trim();
+  const display = document.getElementById('map-name-display');
+  const text = document.getElementById('map-name-text');
+  if (name) {
+    text.textContent = name;
+    display.classList.remove('untitled');
+  } else {
+    text.textContent = 'Untitled Level';
+    display.classList.add('untitled');
+  }
+}
+document.getElementById('map-name-display').addEventListener('click', () => {
   document.getElementById('map-info-modal').style.display = 'flex';
+  document.getElementById('meta-name').focus();
+  // Danger zone only appears when there's a server-side draft to delete.
+  const hasDraft = !!draftCode;
+  document.getElementById('map-info-danger-divider').style.display = hasDraft ? '' : 'none';
+  document.getElementById('map-info-danger').style.display = hasDraft ? '' : 'none';
 });
+
+async function deleteCurrentDraft() {
+  if (!creatorKey || !draftCode) return;
+  const codeToDelete = draftCode;
+  const name = document.getElementById('meta-name').value.trim() || 'Untitled';
+  if (!confirm(`Permanently delete "${name}" (${codeToDelete})?\n\nThis cannot be undone. Anyone holding this code will lose access.`)) return;
+
+  try {
+    const res = await fetch(`/api/unofficial/${codeToDelete}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creatorKey }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+
+    cells = {};
+    specials = { player:null, exit:null,
+                 pickup_gel:null, pickup_mirror:null, pickup_spray:null };
+    villainsPlaced = [];
+    selected = null;
+    document.getElementById('meta-name').value   = '';
+    document.getElementById('meta-author').value = '';
+    document.getElementById('meta-desc').value   = '';
+    updateMapNameDisplay();
+    resetDraftState();
+    centerOnGrid();
+    refreshSidebar();
+    render();
+
+    document.getElementById('map-info-modal').style.display = 'none';
+    setSaveStatus(`Deleted ${codeToDelete}`, '#ff9944');
+  } catch (err) {
+    showAlert('Delete failed: ' + err.message, 'Delete Failed');
+  }
+}
+document.getElementById('btn-delete-draft').addEventListener('click', deleteCurrentDraft);
+document.getElementById('meta-name').addEventListener('input', updateMapNameDisplay);
 document.getElementById('map-info-close').addEventListener('click', () => {
   document.getElementById('map-info-modal').style.display = 'none';
+  updateMapNameDisplay();
 });
 document.getElementById('map-info-apply').addEventListener('click', () => {
   document.getElementById('map-info-modal').style.display = 'none';
+  updateMapNameDisplay();
 });
 document.getElementById('map-info-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('map-info-modal'))
+  if (e.target === document.getElementById('map-info-modal')) {
     document.getElementById('map-info-modal').style.display = 'none';
+    updateMapNameDisplay();
+  }
 });
 
 document.getElementById('btn-templates').addEventListener('click', openTemplatesModal);
@@ -1588,11 +1919,395 @@ document.getElementById('templates-modal').addEventListener('click', e => {
 });
 
 // ─────────────────────────────────────────────
+// QUICK BUILDS — drag/stamp pre-built room layouts
+// ─────────────────────────────────────────────
+const QB_LIST_URL = '/api/quick-builds';
+// Quick Build authoring (the SAVE QB button + Ctrl-Shift-Q shortcut) is a
+// dev-time tool: the saved JSON is meant to be committed to the repo. Gated
+// to localhost so it never appears in production.
+const QB_DEV_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
+function isQuickBuildDevEnv() { return QB_DEV_HOSTS.has(location.hostname); }
+let qbBuilds   = [];     // [{ name, description, _cells, width, height, ... }]
+let placingQB  = null;   // current build being ghost-rendered + stamped on click
+let draggingQB = null;   // build currently being HTML5-dragged from the modal
+let qbDidDrop  = false;  // set by canvas drop handler so dragend knows not to "cancel"
+
+async function loadQuickBuilds() {
+  try {
+    const res = await fetch(QB_LIST_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error('list ' + res.status);
+    const body = await res.json();
+    const builds = Array.isArray(body.builds) ? body.builds : [];
+    qbBuilds = builds.map(expandQuickBuild);
+  } catch (err) {
+    console.warn('Quick Builds could not be loaded:', err);
+    qbBuilds = [];
+  }
+}
+
+// Normalize either compact form (defaultBackground/outerWalls/objects/borders/backgrounds)
+// or full form (cells dict) into a canonical { _cells, width, height } shape.
+function expandQuickBuild(qb) {
+  if (qb._cells) return qb;
+  const out = {};
+
+  if (qb.cells && typeof qb.cells === 'object') {
+    let maxC = 0, maxR = 0;
+    for (const [k, c] of Object.entries(qb.cells)) {
+      const [col, row] = k.split(',').map(Number);
+      if (col > maxC) maxC = col;
+      if (row > maxR) maxR = row;
+      out[`${col},${row}`] = {
+        background: c.background || 'empty',
+        borders: { n:false, s:false, e:false, w:false, ...(c.borders || {}) },
+        object: c.object || null,
+        rotation: c.rotation || 0,
+      };
+    }
+    qb.width  = qb.width  || (maxC + 1);
+    qb.height = qb.height || (maxR + 1);
+  } else {
+    const w = qb.width || 0, h = qb.height || 0;
+    const bg = qb.defaultBackground || 'empty';
+    for (let r = 0; r < h; r++) {
+      for (let c = 0; c < w; c++) {
+        const borders = { n:false, s:false, e:false, w:false };
+        if (qb.outerWalls) {
+          if (r === 0)     borders.n = true;
+          if (r === h - 1) borders.s = true;
+          if (c === 0)     borders.w = true;
+          if (c === w - 1) borders.e = true;
+        }
+        out[`${c},${r}`] = { background: bg, borders, object: null, rotation: 0 };
+      }
+    }
+    for (const e of (qb.backgrounds || [])) {
+      const k = `${e.col},${e.row}`;
+      if (out[k]) out[k].background = e.type;
+    }
+    for (const e of (qb.objects || [])) {
+      const k = `${e.col},${e.row}`;
+      if (out[k]) {
+        out[k].object   = e.type;
+        out[k].rotation = e.rotation || 0;
+      }
+    }
+    for (const e of (qb.borders || [])) {
+      const k = `${e.col},${e.row}`;
+      if (out[k] && Array.isArray(e.dirs))
+        for (const d of e.dirs) out[k].borders[d] = true;
+    }
+  }
+
+  qb._cells = out;
+  return qb;
+}
+
+function openQuickBuildsModal() {
+  if (placingQB) cancelPlaceMode();
+  const modal = document.getElementById('quick-builds-modal');
+  const grid  = document.getElementById('qb-cards');
+  grid.innerHTML = '';
+
+  if (!qbBuilds.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'grid-column:1/-1;color:#d4b483;text-align:center;padding:24px;font-size:12px;';
+    empty.textContent = 'No quick builds available. Drop JSON files into games/quick-builds/ and they will appear here automatically.';
+    grid.appendChild(empty);
+  }
+
+  qbBuilds.forEach((qb) => {
+    const card = document.createElement('div');
+    card.className = 'qb-card';
+
+    const cvs = document.createElement('canvas');
+    cvs.className = 'qb-preview';
+    cvs.width  = 220; cvs.height = 140;
+    cvs.draggable = true;
+    cvs.title = 'Drag onto the grid to stamp, or use PLACE.';
+    cvs.addEventListener('dragstart', (e) => {
+      draggingQB = qb;
+      placingQB  = qb;
+      qbDidDrop  = false;
+      card.classList.add('dragging');
+      modal.classList.add('dragging');
+      // Use the thumbnail as the drag image so cursor carries something.
+      try { e.dataTransfer.setDragImage(cvs, cvs.width / 2, cvs.height / 2); } catch (_) {}
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', qb.name);
+    });
+    cvs.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      modal.classList.remove('dragging');
+      draggingQB = null;
+      if (qbDidDrop) {
+        modal.style.display = 'none';
+      }
+      // Always clear ghost state and re-render.
+      placingQB = null;
+      hoverCell = null;
+      qbDidDrop = false;
+      render();
+    });
+
+    const name = document.createElement('div');
+    name.className = 'qb-name';
+    name.textContent = '★ ' + qb.name.toUpperCase();
+
+    const desc = document.createElement('div');
+    desc.className = 'qb-desc';
+    desc.textContent = qb.description || '';
+
+    const btn = document.createElement('button');
+    btn.className = 'qb-place';
+    btn.textContent = 'PLACE ↘';
+    btn.addEventListener('click', () => {
+      modal.style.display = 'none';
+      enterPlaceMode(qb);
+    });
+
+    card.append(cvs, name, desc, btn);
+    grid.appendChild(card);
+    requestAnimationFrame(() => renderMinimap({ cells: qb._cells, villains: [] }, cvs));
+  });
+
+  modal.style.display = 'flex';
+}
+
+function enterPlaceMode(qb) {
+  placingQB = qb;
+  document.body.classList.add('qb-placing');
+  document.getElementById('qb-place-name').textContent = '★ ' + qb.name.toUpperCase();
+  document.getElementById('qb-place-hud').style.display = 'flex';
+  render();
+}
+
+function cancelPlaceMode() {
+  placingQB = null;
+  document.body.classList.remove('qb-placing');
+  document.getElementById('qb-place-hud').style.display = 'none';
+  hoverCell = null;
+  render();
+}
+
+function stampQuickBuild(qb, anchorCol, anchorRow) {
+  expandQuickBuild(qb);
+  const stamped = [];
+  for (const [k, lcell] of Object.entries(qb._cells)) {
+    const [lc, lr] = k.split(',').map(Number);
+    const c = anchorCol + lc, r = anchorRow + lr;
+    if (!inGrid(c, r)) continue;
+    const targetKey = `${c},${r}`;
+    const existing = cells[targetKey];
+    // Clear special / villain on overwritten cells.
+    if (existing && existing.special && specials[existing.special]) {
+      specials[existing.special] = null;
+    }
+    villainsPlaced = villainsPlaced.filter(v => !(v.col === c && v.row === r));
+    cells[targetKey] = {
+      background: lcell.background,
+      borders: { n:false, s:false, e:false, w:false },
+      object: lcell.object,
+      rotation: lcell.rotation,
+      special: null,
+    };
+    stamped.push([c, r]);
+  }
+  // Re-derive borders so walls only appear at the edge of the active region.
+  // Run autoBorders on every stamped cell *and* every adjacent cell so neighbours
+  // outside the stamp drop walls that now face into it.
+  const seen = new Set();
+  const queue = [];
+  for (const [c, r] of stamped) {
+    const k = `${c},${r}`;
+    if (!seen.has(k)) { seen.add(k); queue.push([c, r]); }
+    for (const [, [dc, dr]] of Object.entries(DELTA)) {
+      const nk = `${c + dc},${r + dr}`;
+      if (cells[nk] && !seen.has(nk)) { seen.add(nk); queue.push([c + dc, r + dr]); }
+    }
+  }
+  for (const [c, r] of queue) autoBorders(c, r);
+
+  selected = null;
+  refreshSidebar();
+  render();
+}
+
+function drawQuickBuildGhost(qb, anchorCol, anchorRow) {
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  for (const [k, lcell] of Object.entries(qb._cells)) {
+    const [lc, lr] = k.split(',').map(Number);
+    const c = anchorCol + lc, r = anchorRow + lr;
+    if (!inGrid(c, r)) continue;
+    drawCellBackground(c, r, lcell);
+    drawCellBorders(c, r, lcell);
+    drawCellObject(c, r, lcell);
+  }
+  ctx.restore();
+  // Stamp area outline
+  const x = anchorCol * cellSize + panX;
+  const y = anchorRow * cellSize + panY;
+  const w = qb.width * cellSize, h = qb.height * cellSize;
+  ctx.strokeStyle = 'rgba(102, 255, 153, 0.85)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 4]);
+  ctx.lineDashOffset = -animTime * 12;
+  ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+  ctx.setLineDash([]);
+  ctx.lineDashOffset = 0;
+}
+
+// Canvas drop handlers — only active while a card is being dragged.
+canvas.addEventListener('dragover', (e) => {
+  if (!draggingQB) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+  const r = canvas.getBoundingClientRect();
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const { col, row } = screenToCell(sx, sy);
+  const inside = inGrid(col, row);
+  hoverCell = inside ? { col, row } : null;
+  render();
+});
+canvas.addEventListener('dragleave', () => {
+  if (!draggingQB) return;
+  hoverCell = null;
+  render();
+});
+canvas.addEventListener('drop', (e) => {
+  if (!draggingQB) return;
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect();
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const { col, row } = screenToCell(sx, sy);
+  if (inGrid(col, row)) {
+    stampQuickBuild(draggingQB, col, row);
+    qbDidDrop = true;
+  }
+});
+
+document.getElementById('btn-quick-builds').addEventListener('click', openQuickBuildsModal);
+document.getElementById('qb-close').addEventListener('click', () => {
+  document.getElementById('quick-builds-modal').style.display = 'none';
+});
+document.getElementById('quick-builds-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('quick-builds-modal'))
+    document.getElementById('quick-builds-modal').style.display = 'none';
+});
+document.getElementById('qb-place-cancel').addEventListener('click', cancelPlaceMode);
+
+// ── Admin: save current map as Quick Build ─────────────────
+function openSaveQBModal() {
+  if (!isQuickBuildDevEnv()) return;
+  if (Object.keys(cells).length === 0) {
+    showAlert('No cells to save. Place some backgrounds and objects first.', 'Nothing to Save');
+    return;
+  }
+  document.getElementById('qb-save-name').value = '';
+  document.getElementById('qb-save-desc').value = '';
+  document.getElementById('qb-save-status').textContent = '';
+  document.getElementById('qb-save-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('qb-save-name').focus(), 0);
+}
+
+function buildQBPayloadFromMap(name, desc) {
+  const keys = Object.keys(cells);
+  if (!keys.length) return null;
+  let minC = Infinity, minR = Infinity, maxC = -Infinity, maxR = -Infinity;
+  for (const k of keys) {
+    const [c, r] = k.split(',').map(Number);
+    if (c < minC) minC = c; if (c > maxC) maxC = c;
+    if (r < minR) minR = r; if (r > maxR) maxR = r;
+  }
+  const outCells = {};
+  for (const [k, cell] of Object.entries(cells)) {
+    const [c, r] = k.split(',').map(Number);
+    outCells[`${c - minC},${r - minR}`] = {
+      background: cell.background,
+      borders: { ...cell.borders },
+      object: cell.object,
+      rotation: cell.rotation || 0,
+    };
+  }
+  return {
+    name,
+    description: desc,
+    data: {
+      width:  maxC - minC + 1,
+      height: maxR - minR + 1,
+      cells:  outCells,
+    },
+  };
+}
+
+async function saveQB() {
+  const name = document.getElementById('qb-save-name').value.trim();
+  const desc = document.getElementById('qb-save-desc').value.trim();
+  const status = document.getElementById('qb-save-status');
+  const btn    = document.getElementById('qb-save-download');
+
+  if (!name) { status.textContent = 'Name required.'; return; }
+
+  const payload = buildQBPayloadFromMap(name, desc);
+  if (!payload) { status.textContent = 'No cells to save.'; return; }
+
+  async function send(overwrite) {
+    return fetch('/api/quick-builds', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, overwrite }),
+    });
+  }
+
+  btn.disabled = true;
+  status.textContent = 'Saving…';
+  try {
+    let res = await send(false);
+    if (res.status === 409) {
+      const body = await res.json().catch(() => ({}));
+      const ok = confirm(`A Quick Build named "${body.file}" already exists. Overwrite?`);
+      if (!ok) { status.textContent = 'Cancelled.'; return; }
+      res = await send(true);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      status.textContent = 'Save failed: ' + (body.error || res.status);
+      return;
+    }
+    const body = await res.json();
+    status.textContent = body.overwrote ? `Updated ${body.file}` : `Wrote ${body.file}`;
+    // Refresh the in-memory list so the new build is immediately stampable.
+    await loadQuickBuilds();
+    setTimeout(() => {
+      document.getElementById('qb-save-modal').style.display = 'none';
+    }, 600);
+  } catch (err) {
+    status.textContent = 'Save failed: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('qb-save-close').addEventListener('click', () => {
+  document.getElementById('qb-save-modal').style.display = 'none';
+});
+document.getElementById('qb-save-download').addEventListener('click', saveQB);
+document.getElementById('qb-save-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('qb-save-modal'))
+    document.getElementById('qb-save-modal').style.display = 'none';
+});
+
+loadQuickBuilds();
+
+// ─────────────────────────────────────────────
 // DRAFT SESSION — creator key + server persistence
 // ─────────────────────────────────────────────
 let creatorKey = null;
 let draftCode  = null;
 let isLocked   = false;
+let isRejected = false;
+let rejectionReason = null;
 let autoSaveTimer = null;
 let lastSavedAt   = null;
 let isSaving      = false;
@@ -1638,12 +2353,14 @@ function buildMapPayload() {
 
 function resetDraftState() {
   draftCode = null; isLocked = false; lastSavedAt = null;
+  isRejected = false; rejectionReason = null;
   if (autoSaveTimer) { clearInterval(autoSaveTimer); autoSaveTimer = null; }
   localStorage.removeItem('cw_draft_code');
   document.getElementById('btn-submit').disabled = true;
   document.getElementById('btn-submit').textContent = 'SUBMIT';
   setSaveStatus('');
   setBuilderLocked(false);
+  renderStatusBanner();
 }
 
 function setSaveStatus(msg, color) {
@@ -1671,6 +2388,57 @@ function setBuilderLocked(locked) {
     tool = 'select';
     document.querySelectorAll('[id^="t-"]').forEach(b => b.disabled = true);
     canvas.style.cursor = 'default';
+  } else {
+    document.querySelectorAll('[id^="t-"]').forEach(b => b.disabled = false);
+  }
+  renderStatusBanner();
+}
+
+// Renders the banner above the workspace based on isLocked / isRejected.
+function renderStatusBanner() {
+  const banner   = document.getElementById('status-banner');
+  const textEl   = document.getElementById('status-banner-text');
+  const reasonEl = document.getElementById('status-banner-reason');
+  const btn      = document.getElementById('btn-banner-action');
+  if (!banner) return;
+
+  banner.className = '';
+  btn.style.display = 'none';
+  btn.onclick = null;
+
+  if (isLocked) {
+    banner.classList.add('submitted');
+    textEl.textContent = '★ SUBMITTED — awaiting admin review.';
+    reasonEl.textContent = 'Need to make changes? Withdraw your submission to keep editing.';
+    btn.textContent = 'WITHDRAW';
+    btn.style.display = '';
+    btn.onclick = withdrawSubmission;
+    return;
+  }
+  if (isRejected) {
+    banner.classList.add('rejected');
+    textEl.textContent = '✕ REJECTED —';
+    reasonEl.textContent = rejectionReason || 'No reason given.';
+    return;
+  }
+}
+
+async function withdrawSubmission() {
+  if (!creatorKey || !draftCode || !isLocked) return;
+  if (!confirm('Withdraw this submission? You\'ll be able to edit again, but you\'ll need to play through and resubmit.')) return;
+
+  try {
+    const res = await fetch(`/api/unofficial/${draftCode}/unsubmit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creatorKey }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+    setBuilderLocked(false);
+    setSaveStatus('Submission withdrawn — editing resumed', '#ffd84a');
+    startAutoSave();
+  } catch (err) {
+    showAlert('Withdraw failed: ' + err.message, 'Withdraw Failed');
   }
 }
 
@@ -1690,7 +2458,7 @@ async function saveDraft(silent = false) {
   if (!specials.exit)                errors.push('No exit position.');
   if (villainsPlaced.length === 0)   errors.push('No villains placed.');
   if (errors.length) {
-    if (!silent) alert('Cannot save draft:\n\n' + errors.join('\n'));
+    if (!silent) showAlert('Cannot save draft:\n\n' + errors.join('\n'), 'Cannot Save');
     return;
   }
 
@@ -1734,26 +2502,143 @@ async function saveDraft(silent = false) {
 
 function showFirstSavePanel(code) {
   const msg = `✓ Draft saved!\n\nMap Code: ${code}\n\nShare this code so others can find your map once it's approved. Your creator key controls editing — keep it safe.`;
-  alert(msg);
+  showAlert(msg, 'Draft Saved');
+}
+
+// ─────────────────────────────────────────────
+// SUBMIT FLOW — play-to-submit gate
+//
+// The creator must beat their own level inside an iframe before the SUBMIT
+// button on the modal becomes active. The iframe game posts
+// { type: 'test:win', time } when the player reaches the exit. We record the
+// time on the server (as a record-of-trust), then call /submit.
+// ─────────────────────────────────────────────
+let submitFlowMap = null;
+let submitFlowReady = false;
+let submitFlowVerified = false;
+let submitFlowTime = null;
+
+function postToSubmitIframe(msg) {
+  const iframe = document.getElementById('submit-iframe');
+  if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(msg, '*');
+}
+
+function setSubmitStatus(text, kind) {
+  const el = document.getElementById('submit-status');
+  if (!el) return;
+  el.textContent = text;
+  el.className = kind || '';
 }
 
 async function submitForReview() {
   if (!creatorKey || !draftCode || isLocked) return;
-  if (!confirm(`Submit "${document.getElementById('meta-name').value.trim() || 'Untitled'}" for official review?\n\nThe level will be locked — you won't be able to edit it further.`)) return;
+
+  // Make sure the latest state is on the server before opening the playthrough.
+  // A pending save would otherwise mean the iframe loads an outdated map.
+  if (isSaving) {
+    showAlert('Still saving — try again in a moment.', 'Wait');
+    return;
+  }
+  await saveDraft(true);
+
+  const errors = [];
+  if (Object.keys(cells).length === 0) errors.push('No active cells.');
+  if (!specials.player) errors.push('No Jax start position.');
+  if (!specials.exit)   errors.push('No exit position.');
+  if (villainsPlaced.length === 0) errors.push('No villains placed.');
+  if (errors.length) {
+    showAlert('Cannot submit:\n\n' + errors.join('\n'), 'Cannot Submit');
+    return;
+  }
+
+  submitFlowMap = buildMapPayload();
+  submitFlowReady = false;
+  submitFlowVerified = false;
+  submitFlowTime = null;
+
+  document.getElementById('btn-submit-confirm').disabled = true;
+  setSubmitStatus('Loading playthrough…');
+
+  document.getElementById('submit-modal').style.display = 'flex';
+  document.getElementById('submit-iframe').src = '/?test=1';
+}
+
+function closeSubmitFlow() {
+  submitFlowMap = null;
+  submitFlowReady = false;
+  submitFlowVerified = false;
+  submitFlowTime = null;
+  document.getElementById('submit-modal').style.display = 'none';
+  document.getElementById('submit-iframe').src = 'about:blank';
+}
+
+async function confirmSubmit() {
+  if (!submitFlowVerified || !creatorKey || !draftCode) return;
+  const btn = document.getElementById('btn-submit-confirm');
+  btn.disabled = true;
+  setSubmitStatus('Submitting…');
 
   try {
-    const res = await fetch(`/api/unofficial/${draftCode}/submit`, {
+    const verifyRes = await fetch(`/api/unofficial/${draftCode}/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creatorKey, time: submitFlowTime }),
+    });
+    if (!verifyRes.ok) throw new Error((await verifyRes.json().catch(() => ({}))).error || `verify ${verifyRes.status}`);
+
+    const submitRes = await fetch(`/api/unofficial/${draftCode}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ creatorKey }),
     });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+    if (!submitRes.ok) throw new Error((await submitRes.json().catch(() => ({}))).error || `submit ${submitRes.status}`);
+
+    isRejected = false;
+    rejectionReason = null;
     setBuilderLocked(true);
     setSaveStatus('Submitted for review ✓', '#aa88ff');
+    closeSubmitFlow();
   } catch (err) {
-    alert('Submit failed: ' + err.message);
+    setSubmitStatus('Submit failed: ' + err.message, 'error');
+    btn.disabled = false;
   }
 }
+
+window.addEventListener('message', (ev) => {
+  const msg = ev.data;
+  if (!msg || typeof msg !== 'object') return;
+
+  // Submit flow iframe
+  if (document.getElementById('submit-modal').style.display !== 'none') {
+    if (msg.type === 'test:ready') {
+      submitFlowReady = true;
+      if (submitFlowMap) {
+        postToSubmitIframe({ type: 'test:load', map: submitFlowMap });
+        setSubmitStatus('Beat the level to enable submit. Restart anytime.');
+      }
+    } else if (msg.type === 'test:win' && !submitFlowVerified) {
+      submitFlowVerified = true;
+      submitFlowTime = Number(msg.time) || 0;
+      setSubmitStatus(`✓ Level beaten in ${submitFlowTime.toFixed(2)}s — ready to submit`, 'success');
+      document.getElementById('btn-submit-confirm').disabled = false;
+    }
+  }
+});
+
+document.getElementById('btn-submit-cancel').addEventListener('click', closeSubmitFlow);
+document.getElementById('btn-submit-restart').addEventListener('click', () => {
+  if (submitFlowReady && submitFlowMap) {
+    submitFlowVerified = false;
+    submitFlowTime = null;
+    document.getElementById('btn-submit-confirm').disabled = true;
+    setSubmitStatus('Beat the level to enable submit. Restart anytime.');
+    postToSubmitIframe({ type: 'test:restart' });
+  }
+});
+document.getElementById('btn-submit-confirm').addEventListener('click', confirmSubmit);
+document.getElementById('submit-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('submit-modal')) closeSubmitFlow();
+});
 
 async function loadDraftFromServer() {
   if (!creatorKey || !draftCode) return;
@@ -1769,10 +2654,31 @@ async function loadDraftFromServer() {
       setSaveStatus('');
       return;
     }
-    const mapData = await res.json();
-    loadMap(mapData);
-    document.getElementById('btn-submit').disabled = false;
-    startAutoSave();
+    const payload = await res.json();
+    const meta = payload._meta || {};
+    delete payload._meta;
+
+    if (meta.official) {
+      // The map has been approved — it lives in the official catalog now and
+      // is no longer editable. Drop the local draft pointer.
+      localStorage.removeItem('cw_draft_code');
+      draftCode = null;
+      setSaveStatus('');
+      showAlert(
+        'This level was approved and published. It now lives in the official catalog and is no longer editable as a draft.\n\nStart a new map to keep building.',
+        'Already Official',
+      );
+      return;
+    }
+
+    loadMap(payload);
+
+    isRejected = !!meta.rejected && !meta.locked;
+    rejectionReason = meta.rejectionReason || null;
+    setBuilderLocked(!!meta.locked);
+
+    document.getElementById('btn-submit').disabled = !!meta.locked;
+    if (!meta.locked) startAutoSave();
     setSaveStatus('Draft loaded ✓', '#66ff99');
   } catch (err) {
     setSaveStatus('');
@@ -1838,7 +2744,36 @@ async function loadDraftFromServer() {
   }
 })();
 
-document.getElementById('btn-save-draft').addEventListener('click', () => saveDraft(false));
+(() => {
+  const btnSave = document.getElementById('btn-save-draft');
+  const menu    = document.getElementById('save-menu');
+  const devMode = isQuickBuildDevEnv();
+
+  if (devMode) {
+    btnSave.textContent = 'SAVE ▾';
+    btnSave.title = 'Save options';
+    btnSave.addEventListener('click', (e) => {
+      e.stopPropagation();
+      menu.style.display = (menu.style.display === 'none' || !menu.style.display) ? 'flex' : 'none';
+    });
+    document.getElementById('mi-save-draft').addEventListener('click', () => {
+      menu.style.display = 'none';
+      saveDraft(false);
+    });
+    document.getElementById('mi-save-qb').addEventListener('click', () => {
+      menu.style.display = 'none';
+      openSaveQBModal();
+    });
+    document.addEventListener('click', (e) => {
+      if (!menu.contains(e.target) && e.target !== btnSave) menu.style.display = 'none';
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') menu.style.display = 'none';
+    });
+  } else {
+    btnSave.addEventListener('click', () => saveDraft(false));
+  }
+})();
 document.getElementById('btn-submit').addEventListener('click', submitForReview);
 
 // ─────────────────────────────────────────────
@@ -1861,7 +2796,7 @@ function postToTestIframe(msg) {
 
 function enterTestMode() {
   const errors = validateMap();
-  if (errors.length) { alert('Cannot test:\n\n' + errors.join('\n')); return; }
+  if (errors.length) { showAlert('Cannot test:\n\n' + errors.join('\n'), 'Cannot Test'); return; }
 
   pendingTestMap = buildMapData();
   testIframeReady = false;
@@ -1910,9 +2845,12 @@ document.getElementById('btn-test-exit').addEventListener('click', exitTestMode)
 buildTileCache();
 buildBgSwatches();
 buildObjectsPalette();
+selectedObjectItem = { kind: 'object', type: OBJ_ORDER[0] };
+selectObjectItem(selectedObjectItem.kind, selectedObjectItem.type);
 window.addEventListener('resize', resize);
 resize();
 centerOnGrid();
+updateMapNameDisplay();
 refreshSidebar();
 render();
 requestAnimationFrame(tickAnim);

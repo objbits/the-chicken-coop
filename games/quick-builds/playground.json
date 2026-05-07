@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "name": "Playground",
+  "description": "Open grass area with sports gear and hedges.",
+  "width": 10,
+  "height": 8,
+  "defaultBackground": "grass",
+  "outerWalls": false,
+  "objects": [
+    { "col": 0, "row": 0, "type": "hedge" },
+    { "col": 1, "row": 0, "type": "hedge" },
+    { "col": 2, "row": 0, "type": "hedge" },
+    { "col": 7, "row": 0, "type": "hedge" },
+    { "col": 8, "row": 0, "type": "hedge" },
+    { "col": 9, "row": 0, "type": "hedge" },
+    { "col": 0, "row": 7, "type": "hedge" },
+    { "col": 1, "row": 7, "type": "hedge" },
+    { "col": 8, "row": 7, "type": "hedge" },
+    { "col": 9, "row": 7, "type": "hedge" },
+    { "col": 0, "row": 3, "type": "fence" },
+    { "col": 0, "row": 4, "type": "fence" },
+    { "col": 9, "row": 3, "type": "fence" },
+    { "col": 9, "row": 4, "type": "fence" },
+    { "col": 2, "row": 2, "type": "basketball" },
+    { "col": 7, "row": 2, "type": "soccerball" },
+    { "col": 4, "row": 5, "type": "hurdle" },
+    { "col": 5, "row": 5, "type": "hurdle" },
+    { "col": 2, "row": 5, "type": "sportsbag" },
+    { "col": 7, "row": 5, "type": "cone" },
+    { "col": 4, "row": 3, "type": "flowerpatch" },
+    { "col": 5, "row": 3, "type": "flowerpatch" }
+  ]
+}

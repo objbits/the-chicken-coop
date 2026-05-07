@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "name": "Classroom",
+  "description": "Standard classroom with blackboard and desks.",
+  "width": 8,
+  "height": 6,
+  "defaultBackground": "classroom",
+  "outerWalls": true,
+  "objects": [
+    { "col": 3, "row": 0, "type": "blackboard" },
+    { "col": 4, "row": 0, "type": "blackboard" },
+    { "col": 7, "row": 3, "type": "door" },
+    { "col": 1, "row": 2, "type": "desk" },
+    { "col": 1, "row": 3, "type": "pushable" },
+    { "col": 3, "row": 2, "type": "desk" },
+    { "col": 3, "row": 3, "type": "pushable" },
+    { "col": 5, "row": 2, "type": "desk" },
+    { "col": 5, "row": 3, "type": "pushable" },
+    { "col": 1, "row": 4, "type": "desk" },
+    { "col": 3, "row": 4, "type": "desk" },
+    { "col": 5, "row": 4, "type": "desk" }
+  ]
+}

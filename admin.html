@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin — The Chicken Coop</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #1a0e04;
+    color: #f0e4c8;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+  header {
+    background: #2a1810;
+    padding: 14px 24px;
+    border-bottom: 4px solid #5a3e22;
+    display: flex; align-items: center; gap: 16px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 18px;
+    letter-spacing: 0.08em;
+    color: #ffd84a;
+  }
+  header .creator-key {
+    color: #a08858; font-size: 11px;
+  }
+  header .right { margin-left: auto; display: flex; gap: 8px; }
+  button {
+    background: #3a2818;
+    color: #f0e4c8;
+    border: 2px solid #1a0e04;
+    box-shadow: inset 1px 1px 0 #5a3e22, inset -1px -1px 0 #0a0500;
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+  button:hover { background: #5a3e22; }
+  button.primary { background: #1a3a25; color: #66ff99; box-shadow: inset 1px 1px 0 #2a5a40, inset -1px -1px 0 #0a2010; }
+  button.primary:hover { background: #2a5a35; }
+  button.danger { background: #3a1a1a; color: #ffaaaa; box-shadow: inset 1px 1px 0 #5a2a2a, inset -1px -1px 0 #200a0a; }
+  button.danger:hover { background: #5a2a2a; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+  #status { color: #a08858; font-size: 12px; margin-bottom: 16px; }
+  .empty {
+    text-align: center;
+    color: #a08858;
+    padding: 60px 20px;
+    border: 2px dashed #5a3e22;
+    border-radius: 4px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #2a1810;
+    border: 2px solid #5a3e22;
+  }
+  th, td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #1a0e04;
+    font-size: 12px;
+  }
+  th {
+    background: #1a0e04;
+    color: #ffd84a;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  td.code {
+    font-weight: bold;
+    color: #a8d4f0;
+  }
+  td.actions {
+    white-space: nowrap;
+  }
+  td.actions button { margin-left: 4px; }
+  .meta {
+    color: #a08858;
+    font-size: 11px;
+  }
+  .verified {
+    color: #66ff99;
+    font-weight: bold;
+  }
+
+  /* Auth overlay */
+  #auth {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  #auth-box {
+    background: #3a2818;
+    border: 4px solid #1a0e04;
+    padding: 24px;
+    width: min(420px, 92vw);
+    box-shadow: inset 2px 2px 0 #5a3e22, inset -2px -2px 0 #1a0e04;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  #auth-box h2 {
+    margin: 0;
+    background: #1a0e04;
+    padding: 8px 12px;
+    border: 2px solid #5a3e22;
+    font-size: 14px;
+    color: #ffd84a;
+    letter-spacing: 0.08em;
+  }
+  #auth-box p { color: #d4b483; font-size: 11px; line-height: 1.6; margin: 0; }
+  #auth-box input {
+    background: #1a0e04;
+    color: #f0e4c8;
+    border: 2px solid #5a3e22;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 14px;
+    letter-spacing: 0.10em;
+  }
+  #auth-error { color: #ff6666; font-size: 11px; min-height: 14px; }
+
+  /* Review modal */
+  #review {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    display: none; align-items: center; justify-content: center;
+    z-index: 90;
+  }
+  #review-box {
+    background: #1a0e04;
+    border: 4px solid #5a3e22;
+    width: min(1180px, 96vw);
+    height: min(760px, 94vh);
+    display: flex; flex-direction: column;
+  }
+  #review-header {
+    background: #2a1810;
+    padding: 10px 14px;
+    border-bottom: 3px solid #5a3e22;
+    display: flex; align-items: center; gap: 12px;
+  }
+  #review-header .title { font-weight: bold; color: #ffd84a; letter-spacing: 0.06em; }
+  #review-header .meta { flex: 1; }
+  #review-body {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+  #review-iframe-wrap { flex: 1; position: relative; background: #000; min-height: 0; }
+  #review-iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  #review-side {
+    width: 280px;
+    flex-shrink: 0;
+    background: #2a1810;
+    border-left: 3px solid #5a3e22;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+  #review-side h3 {
+    margin: 0;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: #ffd84a;
+    background: #1a0e04;
+    padding: 6px 10px;
+    border: 2px solid #5a3e22;
+  }
+  .review-field {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .review-field label {
+    font-size: 10px;
+    color: #a08858;
+    letter-spacing: 0.08em;
+    font-weight: bold;
+  }
+  .review-field input,
+  .review-field textarea {
+    background: #1a0e04;
+    color: #f0e4c8;
+    border: 2px solid #5a3e22;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 12px;
+    resize: vertical;
+  }
+  .review-field textarea { min-height: 60px; }
+  .review-field .count {
+    align-self: flex-end;
+    font-size: 9px;
+    color: #a08858;
+  }
+  .review-meta-row {
+    font-size: 10px;
+    color: #a08858;
+    line-height: 1.6;
+  }
+  .review-meta-row b { color: #d4b483; }
+  #review-footer {
+    background: #2a1810;
+    padding: 10px 14px;
+    border-top: 2px solid #5a3e22;
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  }
+  #reject-reason {
+    flex: 1;
+    background: #1a0e04;
+    color: #f0e4c8;
+    border: 2px solid #5a3e22;
+    padding: 6px 10px;
+    font-family: inherit;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div id="auth">
+  <div id="auth-box">
+    <h2>★ ADMIN LOGIN</h2>
+    <p>Enter the admin key to manage submissions. The key is set in the <code>ADMIN_KEY</code> environment variable on the server.</p>
+    <input type="password" id="auth-input" placeholder="Admin key" autocomplete="off">
+    <div id="auth-error"></div>
+    <button class="primary" id="auth-submit">CONTINUE →</button>
+  </div>
+</div>
+
+<header>
+  <h1>★ ADMIN — REVIEW QUEUE</h1>
+  <span class="creator-key">Submissions awaiting approval</span>
+  <div class="right">
+    <button id="btn-refresh">↻ REFRESH</button>
+    <button id="btn-logout">LOGOUT</button>
+  </div>
+</header>
+
+<main>
+  <div id="status"></div>
+  <div id="queue-wrap"></div>
+</main>
+
+<div id="review">
+  <div id="review-box">
+    <div id="review-header">
+      <span class="title">★ REVIEWING</span>
+      <span class="meta" id="review-meta"></span>
+      <button id="btn-review-close">✕ CLOSE</button>
+    </div>
+    <div id="review-body">
+      <div id="review-iframe-wrap">
+        <iframe id="review-iframe" src="about:blank"></iframe>
+      </div>
+      <aside id="review-side">
+        <h3>★ EDIT BEFORE PUBLISHING</h3>
+        <div class="review-field">
+          <label>NAME</label>
+          <input type="text" id="edit-name" maxlength="40">
+          <span class="count"><span id="edit-name-count">0</span>/40</span>
+        </div>
+        <div class="review-field">
+          <label>AUTHOR</label>
+          <input type="text" id="edit-author" maxlength="24">
+          <span class="count"><span id="edit-author-count">0</span>/24</span>
+        </div>
+        <div class="review-field">
+          <label>DESCRIPTION</label>
+          <textarea id="edit-description" maxlength="120" rows="3"></textarea>
+          <span class="count"><span id="edit-desc-count">0</span>/120</span>
+        </div>
+        <div class="review-field">
+          <label>TAGS (comma-separated)</label>
+          <input type="text" id="edit-tags" placeholder="e.g. easy, classroom, hide-and-seek">
+          <span class="count" style="color:#a08858;font-size:9px;">letters, digits, hyphens · max 10 · 24 chars each</span>
+        </div>
+        <div class="review-meta-row">
+          <div><b>Code:</b> <span id="side-code"></span></div>
+          <div><b>Creator key:</b> <span id="side-key"></span></div>
+          <div><b>Submitted:</b> <span id="side-submitted"></span></div>
+          <div><b>Beat in:</b> <span id="side-beat"></span></div>
+        </div>
+      </aside>
+    </div>
+    <div id="review-footer">
+      <button class="primary" id="btn-approve">✓ APPROVE &amp; PUBLISH</button>
+      <input type="text" id="reject-reason" placeholder="Rejection reason (required to reject)">
+      <button class="danger" id="btn-reject">✕ REJECT</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let adminKey = null;
+let queue = [];
+let reviewing = null;       // { code, ... }
+let reviewIframeReady = false;
+
+const authBox    = document.getElementById('auth');
+const authInput  = document.getElementById('auth-input');
+const authError  = document.getElementById('auth-error');
+const queueWrap  = document.getElementById('queue-wrap');
+const statusEl   = document.getElementById('status');
+const reviewBox  = document.getElementById('review');
+
+function setStatus(msg) { statusEl.textContent = msg || ''; }
+
+async function api(path, opts = {}) {
+  const headers = { ...(opts.headers || {}), 'x-admin-key': adminKey };
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  const res = await fetch('/api/admin' + path, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || ('HTTP ' + res.status));
+  }
+  return res.json();
+}
+
+async function loadQueue() {
+  setStatus('Loading…');
+  try {
+    queue = await api('/queue');
+    renderQueue();
+    setStatus(queue.length ? `${queue.length} submission${queue.length === 1 ? '' : 's'} pending` : '');
+  } catch (err) {
+    setStatus('Failed to load queue: ' + err.message);
+  }
+}
+
+function renderQueue() {
+  if (!queue.length) {
+    queueWrap.innerHTML = '<div class="empty">★ No submissions to review.<br><br>When creators submit levels, they\'ll show up here.</div>';
+    return;
+  }
+  const rows = queue.map(item => {
+    const submitted = item.submittedAt ? new Date(item.submittedAt).toLocaleString() : '—';
+    const verified = item.verifiedTime != null
+      ? `<span class="verified">${item.verifiedTime.toFixed(2)}s</span>`
+      : '<span class="meta">—</span>';
+    return `
+      <tr data-code="${item.code}">
+        <td class="code">${item.code}</td>
+        <td>
+          <div><b>${escapeHtml(item.name)}</b></div>
+          <div class="meta">${escapeHtml(item.description || '')}</div>
+        </td>
+        <td>${escapeHtml(item.author || '—')}</td>
+        <td class="meta">${escapeHtml(item.creatorKey || '')}</td>
+        <td>${verified}</td>
+        <td class="meta">${submitted}</td>
+        <td class="actions">
+          <button data-action="review">REVIEW →</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+  queueWrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th><th>Name</th><th>Author</th><th>Creator Key</th><th>Beat in</th><th>Submitted</th><th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+  queueWrap.querySelectorAll('button[data-action="review"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const code = btn.closest('tr').dataset.code;
+      openReview(code);
+    });
+  });
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[c]);
+}
+
+function openReview(code) {
+  const item = queue.find(q => q.code === code);
+  if (!item) return;
+  reviewing = item;
+  reviewIframeReady = false;
+  document.getElementById('review-meta').textContent =
+    `${item.code} — "${item.name}" by ${item.author || 'Unknown'}` +
+    (item.verifiedTime != null ? ` (creator beat in ${item.verifiedTime.toFixed(2)}s)` : '');
+  document.getElementById('reject-reason').value = '';
+
+  document.getElementById('edit-name').value        = item.name        || '';
+  document.getElementById('edit-author').value      = item.author      || '';
+  document.getElementById('edit-description').value = item.description || '';
+  document.getElementById('edit-tags').value        = (item.tags || []).join(', ');
+  updateEditCounts();
+
+  document.getElementById('side-code').textContent      = item.code;
+  document.getElementById('side-key').textContent       = item.creatorKey || '—';
+  document.getElementById('side-submitted').textContent = item.submittedAt
+    ? new Date(item.submittedAt).toLocaleString() : '—';
+  document.getElementById('side-beat').textContent      = item.verifiedTime != null
+    ? item.verifiedTime.toFixed(2) + 's' : '—';
+
+  reviewBox.style.display = 'flex';
+  document.getElementById('review-iframe').src = '/?test=1';
+}
+
+function updateEditCounts() {
+  document.getElementById('edit-name-count').textContent   = document.getElementById('edit-name').value.length;
+  document.getElementById('edit-author-count').textContent = document.getElementById('edit-author').value.length;
+  document.getElementById('edit-desc-count').textContent   = document.getElementById('edit-description').value.length;
+}
+['edit-name', 'edit-author', 'edit-description'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateEditCounts);
+});
+
+function closeReview() {
+  reviewing = null;
+  reviewIframeReady = false;
+  reviewBox.style.display = 'none';
+  document.getElementById('review-iframe').src = 'about:blank';
+}
+
+window.addEventListener('message', async (ev) => {
+  if (!reviewing) return;
+  const msg = ev.data;
+  if (!msg || typeof msg !== 'object') return;
+  if (msg.type === 'test:ready') {
+    reviewIframeReady = true;
+    try {
+      const map = await api('/map/' + reviewing.code);
+      const iframe = document.getElementById('review-iframe');
+      if (iframe.contentWindow) iframe.contentWindow.postMessage({ type: 'test:load', map }, '*');
+    } catch (err) {
+      setStatus('Map load failed: ' + err.message);
+    }
+  }
+});
+
+async function approveCurrent() {
+  if (!reviewing) return;
+  const code = reviewing.code;
+  const name        = document.getElementById('edit-name').value.trim();
+  const author      = document.getElementById('edit-author').value.trim();
+  const description = document.getElementById('edit-description').value.trim();
+  const tagsRaw     = document.getElementById('edit-tags').value;
+
+  if (!name) {
+    setStatus('Name cannot be empty');
+    document.getElementById('edit-name').focus();
+    return;
+  }
+
+  const tags = tagsRaw.split(',').map(t => t.trim().toLowerCase().replace(/\s+/g, '-')).filter(Boolean);
+  const existingTags = (reviewing.tags || []).join(',');
+  const newTags      = tags.join(',');
+
+  const changes = [];
+  if (name !== (reviewing.name || ''))               changes.push(`name: "${reviewing.name}" → "${name}"`);
+  if (author !== (reviewing.author || ''))           changes.push(`author: "${reviewing.author}" → "${author}"`);
+  if (description !== (reviewing.description || '')) changes.push('description updated');
+  if (newTags !== existingTags)                      changes.push(`tags: [${existingTags}] → [${newTags}]`);
+
+  const summary = changes.length
+    ? `Approve "${name}" (${code}) and publish?\n\nEdits:\n  ${changes.join('\n  ')}`
+    : `Approve "${name}" (${code})? This will publish it to the official catalog.`;
+  if (!confirm(summary)) return;
+
+  try {
+    await api('/approve/' + code, {
+      method: 'POST',
+      body: JSON.stringify({ name, author, description, tags: tagsRaw }),
+    });
+    closeReview();
+    await loadQueue();
+    setStatus(`Approved ${code} ✓`);
+  } catch (err) {
+    setStatus('Approve failed: ' + err.message);
+  }
+}
+
+async function rejectCurrent() {
+  if (!reviewing) return;
+  const reason = document.getElementById('reject-reason').value.trim();
+  if (!reason) {
+    setStatus('Rejection reason required');
+    document.getElementById('reject-reason').focus();
+    return;
+  }
+  const code = reviewing.code;
+  if (!confirm(`Reject "${reviewing.name}" (${code})?\n\nReason: ${reason}\n\nThe creator will see this reason and can revise.`)) return;
+  try {
+    await api('/reject/' + code, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+    closeReview();
+    await loadQueue();
+    setStatus(`Rejected ${code}`);
+  } catch (err) {
+    setStatus('Reject failed: ' + err.message);
+  }
+}
+
+async function tryAuth(key) {
+  try {
+    const res = await fetch('/api/admin/queue', { headers: { 'x-admin-key': key } });
+    if (res.status === 401) { authError.textContent = 'Invalid admin key'; return false; }
+    if (res.status === 503) { authError.textContent = 'Admin not configured (set ADMIN_KEY env var)'; return false; }
+    if (!res.ok) { authError.textContent = 'Server error: ' + res.status; return false; }
+    return true;
+  } catch (err) {
+    authError.textContent = 'Network error: ' + err.message;
+    return false;
+  }
+}
+
+document.getElementById('auth-submit').addEventListener('click', async () => {
+  const key = authInput.value.trim();
+  if (!key) { authError.textContent = 'Enter the admin key'; return; }
+  if (await tryAuth(key)) {
+    adminKey = key;
+    sessionStorage.setItem('cw_admin_key', key);
+    authBox.style.display = 'none';
+    loadQueue();
+  }
+});
+authInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('auth-submit').click();
+});
+document.getElementById('btn-logout').addEventListener('click', () => {
+  adminKey = null;
+  sessionStorage.removeItem('cw_admin_key');
+  authBox.style.display = 'flex';
+  authInput.value = '';
+  authInput.focus();
+});
+document.getElementById('btn-refresh').addEventListener('click', loadQueue);
+document.getElementById('btn-review-close').addEventListener('click', closeReview);
+document.getElementById('btn-approve').addEventListener('click', approveCurrent);
+document.getElementById('btn-reject').addEventListener('click', rejectCurrent);
+reviewBox.addEventListener('click', (e) => { if (e.target === reviewBox) closeReview(); });
+
+(async function init() {
+  const saved = sessionStorage.getItem('cw_admin_key');
+  if (saved && await tryAuth(saved)) {
+    adminKey = saved;
+    authBox.style.display = 'none';
+    loadQueue();
+  } else {
+    authInput.focus();
+  }
+})();
+</script>
+</body>
+</html>

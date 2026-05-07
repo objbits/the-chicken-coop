@@ -10,6 +10,7 @@ services:
       - PORT=3040
       - APP_NAME=The Chicken Academy
       - APP_DOMAIN=thechickenacademy.com
+      - ADMIN_KEY=${ADMIN_KEY:-changeme}
     volumes:
       - .:/app
       - /app/node_modules

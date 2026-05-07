@@ -1,0 +1,372 @@
+{
+  "version": 1,
+  "name": "test",
+  "description": "test",
+  "width": 11,
+  "height": 11,
+  "cells": {
+    "1,4": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,5": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,6": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,7": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,8": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,9": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,9": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,10": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,10": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,10": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,10": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,10": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,10": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,9": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,8": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "10,8": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "10,7": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "10,6": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,4": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,3": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,2": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,1": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,1": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,0": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,0": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,0": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,0": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,0": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,0": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,1": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,2": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,3": {
+      "background": "hallway",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,5": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    }
+  }
+}

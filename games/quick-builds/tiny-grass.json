@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "Tiny Grass",
+  "description": "A tiny piece of grass.",
+  "width": 1,
+  "height": 1,
+  "cells": {
+    "0,0": {
+      "background": "grass",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    }
+  }
+}

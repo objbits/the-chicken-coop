@@ -1,0 +1,1109 @@
+{
+  "version": 1,
+  "name": "Some Dirt",
+  "description": "A dirt spot",
+  "width": 10,
+  "height": 10,
+  "cells": {
+    "0,0": {
+      "background": "dirt",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,0": {
+      "background": "dirt",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,0": {
+      "background": "dirt",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,0": {
+      "background": "dirt",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,0": {
+      "background": "dirt",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,0": {
+      "background": "dirt",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,0": {
+      "background": "dirt",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,0": {
+      "background": "dirt",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,0": {
+      "background": "dirt",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,0": {
+      "background": "dirt",
+      "borders": {
+        "n": true,
+        "s": false,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,1": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,1": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,1": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,1": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,1": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,1": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,1": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,1": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,1": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,1": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,2": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,2": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,2": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,2": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,2": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,2": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,2": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,2": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,2": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,2": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,3": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,3": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,3": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,3": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,3": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,3": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,3": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,3": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,3": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,3": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,4": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,4": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,4": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,4": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,4": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,4": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,4": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,4": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,4": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,4": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,5": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,5": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,5": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,5": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,5": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,5": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,5": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,5": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,5": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,5": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,6": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,6": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,6": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,6": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,6": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,6": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,6": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,6": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,6": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,6": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,7": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,7": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,7": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,7": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,7": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,7": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,7": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,7": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,7": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,7": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,8": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,8": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,8": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,8": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,8": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,8": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,8": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,8": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,8": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,8": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": false,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "0,9": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": false,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "1,9": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "2,9": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "3,9": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "4,9": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "5,9": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "6,9": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "7,9": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "8,9": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": false,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    },
+    "9,9": {
+      "background": "dirt",
+      "borders": {
+        "n": false,
+        "s": true,
+        "e": true,
+        "w": false
+      },
+      "object": null,
+      "rotation": 0
+    }
+  }
+}

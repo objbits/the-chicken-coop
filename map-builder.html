@@ -16,7 +16,7 @@ html, body {
 
 /* ── Toolbar — wood plank look ── */
 #toolbar {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  display: flex; flex-direction: column; gap: 8px;
   padding: 9px 14px;
   background:
     repeating-linear-gradient(0deg, #3a2818 0 28px, #2e2012 28px 30px),
@@ -24,6 +24,15 @@ html, body {
   border-bottom: 4px solid #1a0e04;
   flex-shrink: 0;
   box-shadow: inset 0 2px 0 #5a3e22, 0 2px 0 #1a0e04;
+}
+.toolbar-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.toolbar-row.row-2 {
+  background: rgba(0,0,0,0.22);
+  margin: 0 -14px -9px;
+  padding: 8px 14px;
+  box-shadow: inset 0 2px 0 rgba(0,0,0,0.25);
 }
 .title {
   font-weight: bold;
@@ -35,6 +44,25 @@ html, body {
 .title-accent { color: #cc2020; }
 .sep { width: 2px; height: 24px; background: #1a0e04; margin: 0 2px;
   box-shadow: 1px 0 0 #5a3e22; }
+
+#map-name-display {
+  background: #1a0e04;
+  color: #f0e4c8;
+  border: 2px solid #5a3e22;
+  padding: 4px 10px;
+  display: inline-flex; align-items: center; gap: 8px;
+  letter-spacing: 0.04em; font-size: 12px;
+  box-shadow: inset 1px 1px 0 #2e2012;
+  max-width: 280px;
+}
+#map-name-display:hover { background: #2e2012; border-color: #a08858; }
+#map-name-display .edit-icon { color: #a08858; font-size: 11px; }
+#map-name-display:hover .edit-icon { color: #e8c840; }
+#map-name-text {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 220px;
+}
+#map-name-display.untitled #map-name-text { color: #a08858; font-style: italic; }
 
 button {
   background: #d4b483;
@@ -77,6 +105,20 @@ button:disabled { opacity: 0.4; cursor: default; }
   background: #1a0f06;
 }
 #grid-canvas { display: block; }
+
+/* Floating zoom controls (bottom-right of grid) */
+#zoom-float {
+  position: absolute;
+  right: 12px; bottom: 12px;
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 8px;
+  background:
+    repeating-linear-gradient(0deg, #3a2818 0 28px, #2e2012 28px 30px),
+    #3a2818;
+  border: 3px solid #1a0e04;
+  box-shadow: inset 1px 1px 0 #5a3e22, inset -1px -1px 0 #1a0e04, 0 3px 0 #0a0500;
+  z-index: 10;
+}
 
 /* ── Sidebar — looks like a chalkboard panel framed in wood ── */
 #sidebar {
@@ -421,6 +463,221 @@ hr.divider {
 .tpl-desc { color: #d4b483; font-size: 10px; line-height: 1.5; }
 .tpl-load { width: 100%; margin-top: 2px; }
 
+/* ── Quick Builds Modal (reuses #modal-box) ── */
+#quick-builds-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.78);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+#quick-builds-modal.dragging { opacity: 0; pointer-events: none; }
+#qb-cards {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+.qb-card {
+  background: #1a0e04;
+  border: 2px solid #5a3e22;
+  padding: 10px;
+  display: flex; flex-direction: column; gap: 6px;
+  box-shadow: inset 1px 1px 0 #5a3e22;
+}
+.qb-card:hover { border-color: #d4b483; }
+.qb-preview {
+  display: block; width: 100%;
+  border: 2px solid #5a3e22;
+  image-rendering: pixelated;
+  cursor: grab;
+}
+.qb-preview:active { cursor: grabbing; }
+.qb-card.dragging { opacity: 0.4; }
+.qb-name { font-weight: bold; color: #f0e4c8; font-size: 12px; letter-spacing: 0.04em; }
+.qb-desc { color: #d4b483; font-size: 10px; line-height: 1.4; min-height: 28px; }
+.qb-place { width: 100%; margin-top: 2px; }
+
+/* Placement HUD — floating banner while in stamp mode */
+#qb-place-hud {
+  position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
+  z-index: 60;
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 12px;
+  background: #1a3a15; color: #66ff99;
+  border: 3px solid #1a0e04;
+  font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold;
+  letter-spacing: 0.04em;
+  box-shadow: inset 1px 1px 0 #2a5a20, inset -1px -1px 0 #0a2008, 0 4px 0 #0a0500;
+}
+#qb-place-hud #qb-place-name { color: #aaffcc; }
+#qb-place-cancel {
+  background: #5a1810; color: #f0e4c8;
+  border-color: #1a0e04;
+  box-shadow: inset 1px 1px 0 #8a3020, inset -1px -1px 0 #2a0a04;
+  padding: 2px 8px; font-size: 11px;
+}
+body.qb-placing #grid-canvas { cursor: cell !important; }
+
+/* ── Admin Save Quick Build Modal ── */
+#qb-save-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.78);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 55;
+}
+#qb-save-box {
+  background: #3a2818;
+  border: 4px solid #1a0e04;
+  padding: 18px;
+  width: min(420px, 92vw);
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: inset 2px 2px 0 #5a3e22, inset -2px -2px 0 #1a0e04, 0 4px 0 #0a0500;
+}
+#qb-save-header {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #1a0e04; padding: 8px 12px;
+  border: 2px solid #5a3e22;
+}
+#qb-save-header span {
+  font-weight: bold; color: #f0e4c8; font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+/* ── Themed Alert Modal (replaces native alert) ── */
+#alert-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.78);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 80;
+}
+#alert-box {
+  background: #3a2818;
+  border: 4px solid #1a0e04;
+  padding: 18px;
+  width: min(420px, 92vw);
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: inset 2px 2px 0 #5a3e22, inset -2px -2px 0 #1a0e04, 0 4px 0 #0a0500;
+}
+#alert-header {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #1a0e04; padding: 8px 12px;
+  border: 2px solid #5a3e22;
+}
+#alert-header span {
+  font-weight: bold; color: #f0e4c8; font-size: 13px;
+  letter-spacing: 0.08em;
+}
+#alert-body {
+  color: #d4b483; font-size: 11px; line-height: 1.7;
+  white-space: pre-line;
+  overflow-wrap: break-word;
+  max-height: 60vh; overflow-y: auto;
+}
+#alert-ok { width: 100%; }
+
+/* ── Submit Flow Modal (play-to-submit) ── */
+#submit-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 90;
+}
+#submit-box {
+  background: #1a0e04;
+  border: 4px solid #5a3e22;
+  width: min(960px, 96vw);
+  height: min(720px, 92vh);
+  display: flex; flex-direction: column;
+  box-shadow: 0 6px 0 #0a0500;
+}
+#submit-header {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #2a1a3a; padding: 10px 14px;
+  border-bottom: 3px solid #5a3e22;
+  flex-shrink: 0;
+}
+#submit-header .title {
+  font-weight: bold; color: #aa88ff; font-size: 13px;
+  letter-spacing: 0.08em;
+}
+#submit-instruction {
+  background: #2a1810;
+  color: #d4b483;
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 10px 14px;
+  border-bottom: 2px solid #5a3e22;
+  flex-shrink: 0;
+}
+#submit-instruction b { color: #ffd84a; }
+#submit-iframe-wrap {
+  flex: 1;
+  position: relative;
+  background: #000;
+  min-height: 0;
+}
+#submit-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+#submit-footer {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 14px;
+  background: #2a1810;
+  border-top: 2px solid #5a3e22;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+#submit-status {
+  flex: 1;
+  font-size: 11px; font-weight: bold; letter-spacing: 0.04em;
+  color: #a08858;
+}
+#submit-status.success { color: #66ff99; }
+#submit-status.error   { color: #ff6666; }
+#btn-submit-restart, #btn-submit-cancel { padding: 6px 14px; }
+#btn-submit-confirm {
+  background: #2a1a3a; color: #aa88ff;
+  border-color: #1a0e04;
+  box-shadow: inset 1px 1px 0 #4a2a5a, inset -1px -1px 0 #1a0a2a;
+  padding: 6px 18px;
+}
+#btn-submit-confirm:hover:not(:disabled) { background: #3a2a50; }
+#btn-submit-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Submission status banner (above grid) ── */
+#status-banner {
+  display: none;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  border-bottom: 3px solid #1a0e04;
+  align-items: center;
+  gap: 12px;
+}
+#status-banner.submitted {
+  display: flex;
+  background: #2a1a3a;
+  color: #c8a8ff;
+}
+#status-banner.rejected {
+  display: flex;
+  background: #3a1a1a;
+  color: #ffaaaa;
+}
+#status-banner .reason {
+  font-weight: normal;
+  color: #ffd0d0;
+  flex: 1;
+  white-space: pre-wrap;
+}
+#status-banner button {
+  padding: 4px 12px;
+  font-size: 10px;
+  background: #1a0e04;
+  color: #f0e4c8;
+  border-color: #1a0e04;
+  box-shadow: inset 1px 1px 0 #5a3e22, inset -1px -1px 0 #0a0500;
+}
+#status-banner button:hover { background: #3a2818; }
+
 /* Tool-button row */
 .tool-row { display: flex; gap: 4px; }
 
@@ -516,6 +773,34 @@ hr.divider {
 }
 #draft-info b { color: #ffd84a; }
 
+/* Save dropdown */
+.save-menu-wrap { position: relative; display: inline-block; }
+.save-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  background: #3a2818;
+  border: 3px solid #1a0e04;
+  box-shadow: inset 1px 1px 0 #5a3e22, inset -1px -1px 0 #1a0e04, 0 4px 0 #0a0500;
+  z-index: 30;
+  display: flex; flex-direction: column;
+}
+.save-menu-item {
+  background: transparent;
+  color: #f0e4c8;
+  border: none;
+  padding: 7px 12px;
+  text-align: left;
+  font-family: 'Courier New', monospace;
+  font-size: 11px; font-weight: bold;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: none;
+  border-radius: 0;
+}
+.save-menu-item:hover { background: #5a3e22; color: #e8c840; }
+
 /* Save / Submit buttons */
 #btn-save-draft {
   background: #1a3a15; color: #66ff99;
@@ -598,6 +883,14 @@ hr.divider {
       <textarea id="meta-desc" maxlength="120" rows="2" placeholder="Describe your level..."></textarea>
     </div>
     <button id="map-info-apply" style="width:100%;">DONE ✓</button>
+    <hr class="divider" id="map-info-danger-divider" style="display:none;border:none;border-top:2px solid #5a3e22;margin:12px 0 8px;">
+    <div id="map-info-danger" style="display:none">
+      <div style="color:#ff6666;font-size:10px;font-weight:bold;letter-spacing:0.06em;margin-bottom:6px;">★ DANGER ZONE</div>
+      <div style="color:#d4b483;font-size:10px;line-height:1.6;margin-bottom:8px;">
+        Permanently delete this draft. Anyone holding the code will lose access. <b style="color:#ffaa44;">This cannot be undone.</b>
+      </div>
+      <button id="btn-delete-draft" class="danger-btn" style="width:100%;">✕ DELETE DRAFT</button>
+    </div>
   </div>
 </div>
 
@@ -635,14 +928,41 @@ hr.divider {
 
   <!-- Toolbar -->
   <div id="toolbar">
+   <div class="toolbar-row">
     <button id="btn-back" title="Back to lobby" onclick="window.location.href='/'" style="background:#cc2020;color:#f0e4c8;box-shadow:inset 1px 1px 0 #ee5050, inset -1px -1px 0 #881010;">◀ BACK</button>
     <div class="sep"></div>
-    <span class="title"><span class="title-accent">THE CHICKEN ACADEMY</span> MAP BUILDER</span>
+    <span class="title">MAP BUILDER</span>
+    <div class="sep"></div>
+
+    <button id="map-name-display" title="Click to edit level name, author and description">
+      <span id="map-name-text">Untitled Level</span>
+      <span class="edit-icon">✎</span>
+    </button>
+
     <div class="sep"></div>
 
     <div class="tool-row">
-      <button id="t-select"  class="active" title="S — Select cells" style="font-size:11px;padding:4px 8px;letter-spacing:0.04em;">SELECT</button>
-      <button id="t-bg"      title="B — Paint backgrounds" style="font-size:11px;padding:4px 8px;letter-spacing:0.04em;">BACKGROUND</button>
+      <button id="btn-new">NEW</button>
+      <button id="btn-templates" style="display:none">TEMPLATES</button>
+      <button id="btn-load">LOAD</button>
+      <input type="file" id="file-input" accept=".json" style="display:none">
+      <div class="save-menu-wrap">
+        <button id="btn-save-draft" title="Save draft to server">SAVE DRAFT</button>
+        <div id="save-menu" class="save-menu" style="display:none">
+          <button class="save-menu-item" id="mi-save-draft">Save Draft</button>
+          <button class="save-menu-item" id="mi-save-qb">Save as Quick Build</button>
+        </div>
+      </div>
+      <button id="btn-export">EXPORT</button>
+      <button id="btn-submit" title="Submit for official review" disabled>SUBMIT</button>
+    </div>
+    <span id="save-status"></span>
+   </div>
+
+   <div class="toolbar-row row-2">
+    <div class="tool-row">
+      <button id="t-select"  title="S — Select cells" style="font-size:11px;padding:4px 8px;letter-spacing:0.04em;">SELECT</button>
+      <button id="t-bg"      class="active" title="B — Paint backgrounds" style="font-size:11px;padding:4px 8px;letter-spacing:0.04em;">BACKGROUND</button>
       <button id="t-objects" title="O — Place objects, specials &amp; villains" style="font-size:11px;padding:4px 8px;letter-spacing:0.04em;">OBJECTS</button>
       <button id="t-erase"   title="E — Erase cells" style="font-size:11px;padding:4px 8px;letter-spacing:0.04em;">ERASE</button>
     </div>
@@ -655,42 +975,30 @@ hr.divider {
       <button class="pen-size-btn" data-size="10">10×10</button>
     </div>
 
+    <div id="erase-mode-sep" class="sep" style="display:none"></div>
+    <div id="erase-mode-row" style="display:none;align-items:center;gap:4px;">
+      <button class="erase-mode-btn active" data-mode="all">ALL</button>
+      <button class="erase-mode-btn" data-mode="objects">OBJECTS</button>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="tool-row">
+      <button id="btn-quick-builds" title="Stamp pre-built room layouts">QUICK BUILDS</button>
+    </div>
+
     <div class="sep"></div>
 
     <div id="mode-toggle">
-      <button class="mode-btn active" id="m-builder" title="Builder view (grid + edit)">BUILDER</button>
-      <button class="mode-btn" id="m-game" title="Game view (sprites only)">GAME</button>
+      <button class="mode-btn active" id="m-builder" title="Build view (grid + edit)">BUILD</button>
+      <button class="mode-btn" id="m-game" title="Preview view (sprites only)">PREVIEW</button>
       <button id="btn-play" style="display:none" title="Test play this map (no stats recorded)">▶ PLAY</button>
     </div>
 
     <div class="sep"></div>
 
-    <div style="display:flex;align-items:center;gap:4px">
-      <button id="zoom-out" title="Zoom out (-)">−</button>
-      <span id="zoom-label">16px</span>
-      <button id="zoom-in"  title="Zoom in (+)">+</button>
-    </div>
-
-    <div class="sep"></div>
-
-    <div class="tool-row">
-      <button id="btn-new">NEW</button>
-      <button id="btn-templates">TEMPLATES</button>
-      <button id="btn-load">LOAD</button>
-      <button id="btn-export">EXPORT</button>
-      <input type="file" id="file-input" accept=".json" style="display:none">
-    </div>
-
-    <div class="sep"></div>
-
-    <div class="tool-row">
-      <button id="btn-level-info" title="Edit level name, author and description">LEVEL</button>
-      <button id="btn-save-draft" title="Save draft to server">SAVE DRAFT</button>
-      <button id="btn-submit" title="Submit for official review" disabled>SUBMIT</button>
-    </div>
-    <span id="save-status"></span>
-
     <span id="status">0 cells</span>
+   </div>
   </div>
 
   <!-- Templates Modal -->
@@ -705,10 +1013,96 @@ hr.divider {
     </div>
   </div>
 
+  <!-- Quick Builds Modal -->
+  <div id="quick-builds-modal" style="display:none">
+    <div id="modal-box">
+      <div id="modal-header">
+        <span>★ QUICK BUILDS ★</span>
+        <button id="qb-close">✕</button>
+      </div>
+      <p id="modal-subtitle">Pick a room to stamp onto your map. Click PLACE then click the grid, or drag a card directly onto the grid.</p>
+      <div id="qb-cards"></div>
+    </div>
+  </div>
+
+  <!-- Quick Build placement HUD (visible while in stamping mode) -->
+  <div id="qb-place-hud" style="display:none">
+    <span id="qb-place-name"></span>
+    <span style="opacity:0.7">— click grid to stamp · ESC to cancel</span>
+    <button id="qb-place-cancel">CANCEL</button>
+  </div>
+
+  <!-- Admin: Save Quick Build modal -->
+  <div id="qb-save-modal" style="display:none">
+    <div id="qb-save-box">
+      <div id="qb-save-header">
+        <span>★ SAVE AS QUICK BUILD</span>
+        <button id="qb-save-close" style="padding:2px 10px;font-size:14px;">✕</button>
+      </div>
+      <p style="color:#d4b483;font-size:11px;line-height:1.6;">Exports the active cells of the current map as a Quick Build JSON. Backgrounds, borders, objects and rotations are preserved; specials and villains are stripped.</p>
+      <div class="field" style="margin-bottom:0">
+        <label>★ Name</label>
+        <input type="text" id="qb-save-name" maxlength="40" placeholder="e.g. Classroom">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>★ Description</label>
+        <textarea id="qb-save-desc" maxlength="120" rows="2" placeholder="Short description..."></textarea>
+      </div>
+      <div id="qb-save-status" style="color:#a08858;font-size:11px;font-weight:bold;letter-spacing:0.04em;min-height:14px;"></div>
+      <button id="qb-save-download" style="width:100%;">SAVE TO REPO ✓</button>
+    </div>
+  </div>
+
+  <!-- Submit Flow Modal — play-to-submit gate -->
+  <div id="submit-modal" style="display:none">
+    <div id="submit-box">
+      <div id="submit-header">
+        <span class="title">★ SUBMIT FOR REVIEW</span>
+        <button id="btn-submit-cancel" style="padding:2px 10px;font-size:14px;">✕</button>
+      </div>
+      <div id="submit-instruction">
+        <b>Beat your level to submit it.</b> Reach the exit without getting caught — that proves your level is winnable. Once submitted, the level locks until an admin reviews it.
+      </div>
+      <div id="submit-iframe-wrap">
+        <iframe id="submit-iframe" src="about:blank"></iframe>
+      </div>
+      <div id="submit-footer">
+        <span id="submit-status">Waiting for playthrough…</span>
+        <button id="btn-submit-restart" title="Restart playthrough">↻ RESTART</button>
+        <button id="btn-submit-confirm" disabled>✓ SUBMIT NOW</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Themed alert modal (replaces native alert()) -->
+  <div id="alert-modal" style="display:none">
+    <div id="alert-box">
+      <div id="alert-header">
+        <span id="alert-title">★ NOTICE</span>
+        <button id="alert-close" style="padding:2px 10px;font-size:14px;">✕</button>
+      </div>
+      <div id="alert-body"></div>
+      <button id="alert-ok">OK</button>
+    </div>
+  </div>
+
+  <!-- Submission status banner — shown when locked or rejected -->
+  <div id="status-banner">
+    <span id="status-banner-text"></span>
+    <span class="reason" id="status-banner-reason"></span>
+    <button id="btn-banner-action" style="display:none"></button>
+  </div>
+
   <!-- Workspace -->
   <div id="workspace">
     <div id="grid-wrap">
       <canvas id="grid-canvas"></canvas>
+
+      <div id="zoom-float">
+        <button id="zoom-out" title="Zoom out (-)">−</button>
+        <span id="zoom-label">16px</span>
+        <button id="zoom-in"  title="Zoom in (+)">+</button>
+      </div>
 
       <!-- Test-play overlay: hidden until PLAY is clicked. -->
       <div id="test-overlay" style="display:none">
@@ -778,6 +1172,7 @@ hr.divider {
 </div>
 
 <script src="sprites-shared.js"></script>
+<script src="villain-sprites.js"></script>
 <script src="mb-sprites.js"></script>
 <script src="mb-app.js"></script>
 </body>

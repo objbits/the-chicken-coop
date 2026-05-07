@@ -13,6 +13,7 @@
 <body>
 <canvas id="c"></canvas>
 <script src="sprites-shared.js"></script>
+<script src="villain-sprites.js"></script>
 <script>
 // ─────────────────────────────────────────────
 // CONSTANTS
@@ -1281,7 +1282,12 @@ function drawVillain(v) {
     ctx.shadowBlur = 16;
   }
 
-  Sprites.drawChandlerSprite(ctx, x, y, frame, v.facing || 1, stunned);
+  const villainSprite = window.VILLAIN_SPRITES && window.VILLAIN_SPRITES[v.type];
+  if (villainSprite) {
+    villainSprite.draw(ctx, x, y, frame, v.facing || 1, stunned);
+  } else {
+    Sprites.drawChandlerSprite(ctx, x, y, frame, v.facing || 1, stunned);
+  }
 
   ctx.shadowBlur = 0;
 
@@ -1803,6 +1809,8 @@ async function submitCreatorKey() {
       theme:     'hallway',
       best:      null,
       plays:     0,
+      rejected:  !!l.rejected && !l.locked,
+      rejectionReason: l.rejectionReason || null,
     }));
     myLevelsError = '';
   } catch (err) {
@@ -2171,11 +2179,14 @@ function drawLevelCard(x, y, w, h, lvl) {
   // Status badge for My Levels cards
   if (lvl.cat === 'mine') {
     const isOfficial = !lvl.unofficial;
-    const status = isOfficial ? 'OFFICIAL' : (lvl.locked ? 'SUBMITTED' : 'DRAFT');
-    const badgeColor = isOfficial ? '#00cc66' : (lvl.locked ? '#ff9944' : '#4dabf7');
+    let status, badgeColor, badgeFg;
+    if (isOfficial)        { status = 'OFFICIAL';  badgeColor = '#00cc66'; badgeFg = '#1a3a25'; }
+    else if (lvl.locked)   { status = 'SUBMITTED'; badgeColor = '#ff9944'; badgeFg = '#0e1822'; }
+    else if (lvl.rejected) { status = 'REJECTED';  badgeColor = '#e03040'; badgeFg = '#1a0a0a'; }
+    else                   { status = 'DRAFT';     badgeColor = '#4dabf7'; badgeFg = '#0e1822'; }
     ctx.fillStyle = badgeColor;
     ctx.fillRect(x + 8, y + 32, 70, 16);
-    ctx.fillStyle = isOfficial ? '#1a3a25' : '#0e1822';
+    ctx.fillStyle = badgeFg;
     ctx.font = 'bold 9px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(status, x + 8 + 35, y + 43);
@@ -2649,7 +2660,11 @@ function update(dt) {
 
   // Exit check
   if (overlaps(jaxObj, exitPos)) {
+    const wasWin = gameState === 'win';
     gameState = 'win';
+    if (!wasWin && TEST_MODE && window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'test:win', time: levelTime }, '*');
+    }
   }
 
   // Villain catch check
