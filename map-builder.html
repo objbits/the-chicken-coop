@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Map Builder — The Chicken Coop</title>
+<title>Map Builder — The Chicken Academy</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
@@ -155,36 +155,20 @@ select {
 }
 select:focus { outline: none; background: #e8c898; }
 
-/* Border compass */
-.border-compass {
-  display: grid;
-  grid-template-columns: 1fr 64px 1fr;
-  grid-template-rows: 30px 30px 30px;
-  gap: 4px; width: 144px; margin: 0 auto;
-}
-.bc-empty { background: transparent; }
-.bc-center {
+input[type="text"], textarea {
+  width: 100%;
   background: #1a0e04;
-  border: 2px solid #5a3e22;
-  display: flex; align-items: center;
-  justify-content: center; color: #d4b483; font-size: 18px;
-}
-.border-btn {
-  background: #d4b483;
-  border: 2px solid #1a0e04;
-  color: #1a0e04;
-  cursor: pointer;
-  font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold;
-  display: flex; align-items: center; justify-content: center;
-  user-select: none;
-  box-shadow: inset 1px 1px 0 #f0d8a8, inset -1px -1px 0 #a08858;
-}
-.border-btn:hover { background: #e8c898; }
-.border-btn.active {
-  background: #8b6f47;
   color: #f0e4c8;
-  box-shadow: inset 1px 1px 0 #a07848, inset -1px -1px 0 #6b5235;
+  border: 2px solid #5a3e22;
+  padding: 5px 6px;
+  font-family: 'Courier New', monospace; font-size: 12px;
+  border-radius: 0; resize: none;
+  box-sizing: border-box;
 }
+input[type="text"]:focus, textarea:focus {
+  outline: none; border-color: #e8c840;
+}
+input[type="text"]::placeholder, textarea::placeholder { color: #5a3e22; }
 
 /* Special — radio-style buttons with mini sprites */
 .special-grid {
@@ -209,7 +193,24 @@ select:focus { outline: none; background: #e8c898; }
 }
 #s-player.active { background: #4dabf7; box-shadow: inset 1px 1px 0 #88ccff, inset -1px -1px 0 #2a6a9a; }
 #s-exit.active   { background: #00cc66; color: #1a0e04; box-shadow: inset 1px 1px 0 #4ee090, inset -1px -1px 0 #008844; }
-#s-villain.active{ background: #cc2020; }
+
+.villain-type-btn {
+  width: 100%; text-align: left;
+  background: #1a0e04;
+  border: 2px solid #5a3e22;
+  color: #d4b483;
+  padding: 5px 8px;
+  cursor: pointer;
+  font-family: 'Courier New', monospace; font-size: 11px; font-weight: bold;
+  letter-spacing: 0.06em;
+  border-radius: 0;
+  box-shadow: none;
+}
+.villain-type-btn:hover { background: #2e2012; }
+.villain-type-btn.active {
+  background: #1a0e04;
+  box-shadow: inset 2px 0 0 currentColor;
+}
 
 .danger-btn {
   width: 100%;
@@ -225,6 +226,69 @@ hr.divider {
   border-top: 2px solid #1a0e04;
   border-bottom: 2px solid #5a3e22;
   margin: 14px 0;
+}
+
+/* ── Object palette tabs ── */
+#obj-tab-bar {
+  display: flex;
+  background: #1a0e04;
+  border: 2px solid #1a0e04;
+  margin-bottom: 8px;
+}
+.obj-tab {
+  flex: 1; padding: 5px 2px;
+  background: transparent; border: none;
+  color: #d4b483; font-family: 'Courier New', monospace;
+  font-size: 9px; font-weight: bold; letter-spacing: 0.05em;
+  cursor: pointer; box-shadow: none;
+}
+.obj-tab:hover { background: #2e2012; color: #e8c840; }
+.obj-place-item.placed { opacity: 0.35; }
+.obj-tab.active {
+  background: #d4b483; color: #1a0e04;
+  box-shadow: inset 1px 1px 0 #f0d8a8;
+}
+
+/* ── Context panel — secondary properties panel (left of sidebar) ── */
+#context-panel {
+  width: 114px; flex-shrink: 0;
+  background: #2e2012;
+  border-left: 4px solid #1a0e04;
+  display: flex; flex-direction: column;
+  box-shadow: inset 2px 0 0 #5a3e22;
+}
+#context-scroll {
+  flex: 1; overflow-y: auto; padding: 12px 10px;
+  min-height: 0;
+}
+#context-scroll::-webkit-scrollbar { width: 6px; }
+#context-scroll::-webkit-scrollbar-track { background: #1a0e04; }
+#context-scroll::-webkit-scrollbar-thumb { background: #5a3e22; }
+#context-scroll .field > label { font-size: 9px; }
+#context-scroll .rot-btn { font-size: 12px; padding: 6px 2px; }
+
+/* ── Map Info Modal ── */
+#map-info-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.78);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+#map-info-box {
+  background: #3a2818;
+  border: 4px solid #1a0e04;
+  padding: 18px;
+  width: min(360px, 90vw);
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: inset 2px 2px 0 #5a3e22, inset -2px -2px 0 #1a0e04, 0 4px 0 #0a0500;
+}
+#map-info-header {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #1a0e04; padding: 8px 12px;
+  border: 2px solid #5a3e22;
+}
+#map-info-header span {
+  font-weight: bold; color: #f0e4c8; font-size: 13px;
+  letter-spacing: 0.08em;
 }
 
 /* ── Background swatches — use real tile patterns ── */
@@ -392,22 +456,203 @@ hr.divider {
   font-size: 10px;
   font-weight: bold;
 }
+
+/* ── Session overlay ── */
+#session-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.92);
+  display: flex; align-items: center; justify-content: center;
+}
+#session-box {
+  background: #3a2818;
+  border: 4px solid #1a0e04;
+  padding: 24px;
+  width: min(460px, 90vw);
+  box-shadow: inset 2px 2px 0 #5a3e22, inset -2px -2px 0 #1a0e04, 0 4px 0 #0a0500;
+  display: flex; flex-direction: column; gap: 12px;
+}
+#session-box .session-header {
+  background: #1a0e04;
+  border: 2px solid #5a3e22;
+  padding: 8px 12px;
+  font-weight: bold; color: #f0e4c8; font-size: 14px;
+  letter-spacing: 0.08em;
+}
+#session-box .session-label {
+  color: #d4b483; font-size: 11px; line-height: 1.7;
+}
+.key-input-row { display: flex; gap: 8px; }
+#key-input {
+  flex: 1;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  font-size: 15px !important;
+  font-weight: bold !important;
+  text-align: center;
+}
+#key-error { color: #ff6666; font-size: 10px; min-height: 14px; font-weight: bold; letter-spacing: 0.04em; }
+.session-divider {
+  display: flex; align-items: center; gap: 10px;
+}
+.session-divider::before, .session-divider::after {
+  content: ''; flex: 1; height: 1px; background: #5a3e22;
+}
+.session-divider span { color: #a08858; font-size: 10px; font-weight: bold; letter-spacing: 0.06em; }
+#btn-generate-key {
+  width: 100%;
+  background: #1a3a15; color: #66ff99;
+  border-color: #1a0e04;
+  box-shadow: inset 1px 1px 0 #2a5a20, inset -1px -1px 0 #0a2008;
+}
+#btn-generate-key:hover { background: #264f20; }
+.session-warning {
+  color: #ffaa44; font-size: 10px; line-height: 1.8;
+  border-top: 2px solid #1a0e04;
+  padding-top: 10px;
+}
+#draft-info {
+  background: #1a0e04; border: 2px solid #5a3e22;
+  padding: 8px 10px; font-size: 11px; color: #a8d4f0;
+}
+#draft-info b { color: #ffd84a; }
+
+/* Save / Submit buttons */
+#btn-save-draft {
+  background: #1a3a15; color: #66ff99;
+  border-color: #1a0e04;
+  box-shadow: inset 1px 1px 0 #2a5a20, inset -1px -1px 0 #0a2008;
+}
+#btn-save-draft:hover:not(:disabled) { background: #264f20; }
+#btn-submit {
+  background: #2a1a3a; color: #aa88ff;
+  border-color: #1a0e04;
+  box-shadow: inset 1px 1px 0 #4a2a5a, inset -1px -1px 0 #1a0a2a;
+}
+#btn-submit:hover:not(:disabled) { background: #3a2a50; }
+#save-status {
+  color: #a08858; font-size: 10px; font-weight: bold; letter-spacing: 0.04em;
+}
+
+/* ── PLAY button (Game-mode only) ── */
+#btn-play {
+  background: #66cc66;
+  color: #1a0e04;
+  border-color: #1a0e04;
+  box-shadow: inset 1px 1px 0 #99ee99, inset -1px -1px 0 #338855;
+  margin-left: 4px;
+  padding: 4px 12px;
+  letter-spacing: 0.05em;
+}
+#btn-play:hover { background: #88ee88; }
+
+/* ── Test-play overlay (sits on top of #grid-wrap) ── */
+#test-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  z-index: 100;
+}
+#test-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  background:
+    repeating-linear-gradient(0deg, #2a1810 0 24px, #20100a 24px 26px),
+    #2a1810;
+  border-bottom: 3px solid #1a0e04;
+  flex-shrink: 0;
+}
+#test-toolbar .test-label {
+  color: #66ff99;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  text-shadow: 1px 1px 0 #1a0e04;
+}
+#test-iframe {
+  flex: 1;
+  border: 0;
+  background: #000;
+  width: 100%;
+}
 </style>
 </head>
 <body>
+<!-- Map Info Modal -->
+<div id="map-info-modal" style="display:none">
+  <div id="map-info-box">
+    <div id="map-info-header">
+      <span>★ LEVEL INFO</span>
+      <button id="map-info-close" style="padding:2px 10px;font-size:14px;">✕</button>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>★ Level Name</label>
+      <input type="text" id="meta-name" maxlength="40" placeholder="My Level">
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>★ Author</label>
+      <input type="text" id="meta-author" maxlength="24" placeholder="your name">
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>★ Description</label>
+      <textarea id="meta-desc" maxlength="120" rows="2" placeholder="Describe your level..."></textarea>
+    </div>
+    <button id="map-info-apply" style="width:100%;">DONE ✓</button>
+  </div>
+</div>
+
+<!-- Session overlay — shown on page load until creator key is confirmed -->
+<div id="session-overlay">
+  <div id="session-box">
+    <div class="session-header">★ MAP BUILDER — CREATOR SESSION</div>
+    <p class="session-label">Enter your creator key to access your levels, or generate a new one.</p>
+
+    <div class="field" style="margin-bottom:0">
+      <label>CREATOR KEY</label>
+      <div class="key-input-row">
+        <input type="text" id="key-input" maxlength="9" placeholder="XXXX-XXXX" autocomplete="off" spellcheck="false">
+        <button id="btn-continue-key">CONTINUE →</button>
+      </div>
+    </div>
+    <div id="key-error"></div>
+
+    <div class="session-divider"><span>OR</span></div>
+
+    <button id="btn-generate-key">⊕ GENERATE NEW KEY</button>
+
+    <p class="session-warning">
+      ⚠ Your creator key is the only way to access and edit your levels.<br>
+      Write it down before continuing — it cannot be recovered.
+    </p>
+
+    <div id="draft-info" style="display:none">
+      Draft on file: <b id="draft-code-display"></b> — will be loaded when you continue.
+    </div>
+  </div>
+</div>
+
 <div id="app">
 
   <!-- Toolbar -->
   <div id="toolbar">
-    <button id="btn-back" title="Back to lobby" onclick="window.location.href='index.html'" style="background:#cc2020;color:#f0e4c8;box-shadow:inset 1px 1px 0 #ee5050, inset -1px -1px 0 #881010;">◀ BACK</button>
+    <button id="btn-back" title="Back to lobby" onclick="window.location.href='/'" style="background:#cc2020;color:#f0e4c8;box-shadow:inset 1px 1px 0 #ee5050, inset -1px -1px 0 #881010;">◀ BACK</button>
     <div class="sep"></div>
-    <span class="title"><span class="title-accent">CHANDLER'S</span> MAP BUILDER</span>
+    <span class="title"><span class="title-accent">THE CHICKEN ACADEMY</span> MAP BUILDER</span>
     <div class="sep"></div>
 
     <div class="tool-row">
-      <button id="t-select" class="active" title="S — Select cells">SELECT</button>
-      <button id="t-paint"  title="P — Place cells">PLACE</button>
-      <button id="t-erase"  title="E — Erase cells">ERASE</button>
+      <button id="t-select"  class="active" title="S — Select cells" style="font-size:11px;padding:4px 8px;letter-spacing:0.04em;">SELECT</button>
+      <button id="t-bg"      title="B — Paint backgrounds" style="font-size:11px;padding:4px 8px;letter-spacing:0.04em;">BACKGROUND</button>
+      <button id="t-objects" title="O — Place objects, specials &amp; villains" style="font-size:11px;padding:4px 8px;letter-spacing:0.04em;">OBJECTS</button>
+      <button id="t-erase"   title="E — Erase cells" style="font-size:11px;padding:4px 8px;letter-spacing:0.04em;">ERASE</button>
+    </div>
+
+    <div id="pen-size-sep" class="sep" style="display:none"></div>
+    <div id="pen-size-row" style="display:none;align-items:center;gap:4px;">
+      <button class="pen-size-btn active" data-size="1">1×1</button>
+      <button class="pen-size-btn" data-size="2">2×2</button>
+      <button class="pen-size-btn" data-size="5">5×5</button>
+      <button class="pen-size-btn" data-size="10">10×10</button>
     </div>
 
     <div class="sep"></div>
@@ -415,6 +660,7 @@ hr.divider {
     <div id="mode-toggle">
       <button class="mode-btn active" id="m-builder" title="Builder view (grid + edit)">BUILDER</button>
       <button class="mode-btn" id="m-game" title="Game view (sprites only)">GAME</button>
+      <button id="btn-play" style="display:none" title="Test play this map (no stats recorded)">▶ PLAY</button>
     </div>
 
     <div class="sep"></div>
@@ -435,6 +681,15 @@ hr.divider {
       <input type="file" id="file-input" accept=".json" style="display:none">
     </div>
 
+    <div class="sep"></div>
+
+    <div class="tool-row">
+      <button id="btn-level-info" title="Edit level name, author and description">LEVEL</button>
+      <button id="btn-save-draft" title="Save draft to server">SAVE DRAFT</button>
+      <button id="btn-submit" title="Submit for official review" disabled>SUBMIT</button>
+    </div>
+    <span id="save-status"></span>
+
     <span id="status">0 cells</span>
   </div>
 
@@ -454,16 +709,51 @@ hr.divider {
   <div id="workspace">
     <div id="grid-wrap">
       <canvas id="grid-canvas"></canvas>
+
+      <!-- Test-play overlay: hidden until PLAY is clicked. -->
+      <div id="test-overlay" style="display:none">
+        <div id="test-toolbar">
+          <span class="test-label">▶ TEST MODE — STATS NOT RECORDED</span>
+          <span style="flex:1"></span>
+          <button id="btn-test-restart" title="Restart playthrough">↻ RESTART</button>
+          <button id="btn-test-exit" title="Exit test mode">✕ EXIT</button>
+        </div>
+        <iframe id="test-iframe" src="about:blank"></iframe>
+      </div>
+    </div>
+
+    <!-- Context panel — object properties, shown when a cell with an object is selected -->
+    <div id="context-panel" style="display:none">
+      <div id="context-scroll">
+        <div class="field">
+          <label>★ Rotation <span style="color:#a08858;font-size:9px;font-weight:normal">(R)</span></label>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <button class="rot-btn active" data-rot="0"   title="0°">0°</button>
+            <button class="rot-btn"        data-rot="90"  title="90°">90°</button>
+            <button class="rot-btn"        data-rot="180" title="180°">180°</button>
+            <button class="rot-btn"        data-rot="270" title="270°">270°</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Sidebar -->
     <div id="sidebar">
     <div id="sidebar-scroll">
 
-      <!-- Always-visible background picker -->
-      <div class="field">
+      <!-- Background picker — hidden when objects tool is active -->
+      <div id="bg-field" class="field">
         <label>★ Background</label>
         <div id="bg-swatches"></div>
+      </div>
+
+      <!-- Objects palette — visible when objects tool is active or cell is selected -->
+      <div id="objects-palette" style="display:none">
+        <hr class="divider">
+        <div class="field">
+          <label>★ Object &amp; Special</label>
+          <div id="obj-place-grid"></div>
+        </div>
       </div>
 
       <hr class="divider">
@@ -472,74 +762,12 @@ hr.divider {
         <b>★ NO CELL SELECTED ★</b><br><br>
         Click a cell with <b>SELECT</b><br>
         to edit it.<br><br>
-        Use <b>PLACE</b> to add cells,<br>
+        Use <b>BG</b> to paint cells,<br>
+        <b>OBJ</b> to place items,<br>
         <b>ERASE</b> to remove them.
       </div>
 
       <div id="cell-editor" style="display:none">
-        <h3 id="cell-title">CELL [0, 0]</h3>
-
-        <div class="field">
-          <label>★ Background</label>
-          <select id="bg-select">
-            <option value="empty">Void</option>
-            <option value="hallway">Hallway (tan tile)</option>
-            <option value="classroom">Classroom (linoleum)</option>
-            <option value="cafeteria">Cafeteria</option>
-            <option value="carpet">Carpet (office)</option>
-            <option value="grass">Grass (field)</option>
-            <option value="dirt">Dirt (baseball)</option>
-            <option value="concrete">Concrete</option>
-            <option value="asphalt">Asphalt (court)</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label>★ Borders — Brick Wall</label>
-          <div class="border-compass">
-            <div class="bc-empty"></div>
-            <button class="border-btn" id="b-n">N</button>
-            <div class="bc-empty"></div>
-
-            <button class="border-btn" id="b-w">W</button>
-            <div class="bc-center">▣</div>
-            <button class="border-btn" id="b-e">E</button>
-
-            <div class="bc-empty"></div>
-            <button class="border-btn" id="b-s">S</button>
-            <div class="bc-empty"></div>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>★ Object</label>
-          <div id="obj-swatches"></div>
-        </div>
-
-        <div class="field" id="rotation-field">
-          <label>★ Rotation <span style="color:#a08858;font-size:9px;font-weight:normal">(R to cycle)</span></label>
-          <div class="rot-row">
-            <button class="rot-btn active" data-rot="0"   title="0° — default orientation">0°</button>
-            <button class="rot-btn"        data-rot="90"  title="90° clockwise">90°</button>
-            <button class="rot-btn"        data-rot="180" title="180°">180°</button>
-            <button class="rot-btn"        data-rot="270" title="270° clockwise">270°</button>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>★ Special — Spawn Marker</label>
-          <div class="special-grid">
-            <button class="spec-btn" id="s-player"><canvas width="32" height="32"></canvas><span>JAX</span></button>
-            <button class="spec-btn" id="s-exit"><canvas width="32" height="32"></canvas><span>EXIT</span></button>
-            <button class="spec-btn" id="s-villain"><canvas width="32" height="32"></canvas><span>CHANDLER</span></button>
-            <button class="spec-btn" id="s-pickup-gel"><canvas width="32" height="32"></canvas><span>HAIR GEL</span></button>
-            <button class="spec-btn" id="s-pickup-mirror"><canvas width="32" height="32"></canvas><span>MIRROR</span></button>
-            <button class="spec-btn" id="s-pickup-spray"><canvas width="32" height="32"></canvas><span>HAIRSPRAY</span></button>
-          </div>
-        </div>
-
-        <hr class="divider">
-
         <button class="danger-btn" id="btn-deactivate">✕ DEACTIVATE CELL</button>
       </div>
 
@@ -549,6 +777,7 @@ hr.divider {
   </div>
 </div>
 
+<script src="sprites-shared.js"></script>
 <script src="mb-sprites.js"></script>
 <script src="mb-app.js"></script>
 </body>

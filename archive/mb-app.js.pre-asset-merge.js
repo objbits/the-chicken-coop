@@ -386,18 +386,14 @@ function drawCellSpecial(col, row, cell) {
     dy = Math.sin(animTime * 3 + col * 0.7 + row * 0.4) * Math.max(1, s * 0.04);
   }
 
-  if (cell.special === 'player') {
-    Sprites.drawJaxInCell(ctx, x, y + dy, s, 0, 1);
-  } else if (cell.special === 'villain') {
-    Sprites.drawChandlerInCell(ctx, x, y + dy, s, 0, 1, false);
-  } else {
-    const drawFn = {
-      pickup_gel: Sprites.drawGel,
-      pickup_mirror: Sprites.drawMirror,
-      pickup_spray: Sprites.drawSpray,
-    }[cell.special];
-    if (drawFn) drawFn(ctx, x, y + dy, s);
-  }
+  const drawFn = {
+    player: window.MB_drawJaxIcon,
+    villain: window.MB_drawChandlerIcon,
+    pickup_gel: window.MB_drawGel,
+    pickup_mirror: window.MB_drawMirror,
+    pickup_spray: window.MB_drawSpray,
+  }[cell.special];
+  if (drawFn) drawFn(ctx, x, y + dy, s);
 
   // Spawn label for player
   if (viewMode === 'builder' && s >= 24 && cell.special === 'player') {
@@ -428,7 +424,7 @@ function drawVillainsOverlay(c0, r0, c1, r1) {
       ctx.fillRect(x, y, s, s);
       ctx.restore();
     }
-    Sprites.drawChandlerInCell(ctx, x, y, s, 0, 1, false);
+    window.MB_drawChandlerIcon(ctx, x, y, s);
     if (viewMode === 'builder' && s >= 16) {
       ctx.fillStyle = def.color;
       ctx.strokeStyle = '#000';
@@ -456,7 +452,8 @@ function refreshSidebar() {
   if (tool !== 'select') {
     noSel.style.display = 'none';
     editor.style.display = 'none';
-    const showCtx = tool === 'objects' && selectedObjectItem.kind === 'object';
+    const ctxCell = objCtxPos ? getCell(objCtxPos.col, objCtxPos.row) : null;
+    const showCtx = tool === 'objects' && ctxCell && !!ctxCell.object;
     ctxPanel.style.display = showCtx ? 'flex' : 'none';
     if (showCtx) {
       document.querySelectorAll('.rot-btn').forEach(b => b.classList.toggle('active', Number(b.dataset.rot) === paintRotation));
@@ -548,8 +545,6 @@ canvas.addEventListener('mousedown', e => {
       }
     }
     objCtxPos = cell.object ? { col, row } : null;
-    isPainting = true;
-    lastPainted = { col, row };
     refreshSidebar();
     refreshSpecialPlacedState();
     selectObjectItem(selectedObjectItem.kind, selectedObjectItem.type);
@@ -591,36 +586,10 @@ canvas.addEventListener('mousemove', e => {
   } else if (tool === 'erase') {
     deactivateCell(col, row);
     render();
-  } else if (tool === 'objects') {
-    if (!isActive(col, row)) return;
-    const cell = getCell(col, row);
-    if (selectedObjectItem.kind === 'none') {
-      cell.object = null; cell.rotation = 0;
-      if (cell.special) { specials[cell.special] = null; cell.special = null; }
-      villainsPlaced = villainsPlaced.filter(v => !(v.col === col && v.row === row));
-    } else if (selectedObjectItem.kind === 'object') {
-      cell.object = selectedObjectItem.type;
-      cell.rotation = paintRotation;
-    } else if (selectedObjectItem.kind === 'special') {
-      assignSpecial(col, row, selectedObjectItem.type);
-    } else if (selectedObjectItem.kind === 'villain') {
-      const type = selectedObjectItem.type;
-      if (!villainsPlaced.find(v => v.col === col && v.row === row)) {
-        villainsPlaced = villainsPlaced.filter(v => !(v.col === col && v.row === row));
-        villainsPlaced.push({ type, col, row, data: { speed: VILLAIN_DEFS[type].defaultSpeed } });
-      }
-    }
-    objCtxPos = cell.object ? { col, row } : null;
-    render();
   }
 });
 
 canvas.addEventListener('mouseup', () => {
-  if (isPainting && tool === 'objects') {
-    refreshSidebar();
-    refreshSpecialPlacedState();
-    selectObjectItem(selectedObjectItem.kind, selectedObjectItem.type);
-  }
   isPainting = false;
   isPanning = false;
   setCanvasCursor();
@@ -777,7 +746,6 @@ function addObjSwatch(container, kind, type, label, renderFn, opts = {}) {
 function handlePaletteClick(kind, type) {
   if (tool === 'objects') {
     selectObjectItem(kind, type);
-    refreshSidebar();
     return;
   }
   if (tool !== 'select' || !selected) return;
@@ -840,11 +808,11 @@ function renderObjTabContent() {
   } else if (activeObjTab === 'specials') {
     content.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:5px;';
     const drawFns = {
-      player: (c, x, y, s) => Sprites.drawJaxInCell(c, x, y, s, 0, 1),
-      exit: (c, x, y, s) => Sprites.drawExit(c, x, y, s, 0),
-      pickup_gel: Sprites.drawGel,
-      pickup_mirror: Sprites.drawMirror,
-      pickup_spray: Sprites.drawSpray,
+      player: window.MB_drawJaxIcon,
+      exit: (c, x, y, s) => window.MB_drawExit(c, x, y, s, 0),
+      pickup_gel: window.MB_drawGel,
+      pickup_mirror: window.MB_drawMirror,
+      pickup_spray: window.MB_drawSpray,
     };
     const labels = { player: 'JAX', exit: 'EXIT', pickup_gel: 'GEL', pickup_mirror: 'MIRROR', pickup_spray: 'SPRAY' };
     for (const key of SPECIAL_KEYS) {
@@ -912,9 +880,9 @@ function filterObjPalette(query) {
     blackboard: window.MB_drawBlackboard,
   };
   const specDrawFns = {
-    player: (c, x, y, s) => Sprites.drawJaxInCell(c, x, y, s, 0, 1),
-    exit: (c, x, y, s) => Sprites.drawExit(c, x, y, s, 0),
-    pickup_gel: Sprites.drawGel, pickup_mirror: Sprites.drawMirror, pickup_spray: Sprites.drawSpray,
+    player: window.MB_drawJaxIcon,
+    exit: (c, x, y, s) => window.MB_drawExit(c, x, y, s, 0),
+    pickup_gel: window.MB_drawGel, pickup_mirror: window.MB_drawMirror, pickup_spray: window.MB_drawSpray,
   };
   const specLabels = { player: 'JAX', exit: 'EXIT', pickup_gel: 'GEL', pickup_mirror: 'MIRROR', pickup_spray: 'SPRAY' };
 
@@ -1042,8 +1010,6 @@ function setViewMode(mode) {
   viewMode = mode;
   document.getElementById('m-builder').classList.toggle('active', mode === 'builder');
   document.getElementById('m-game').classList.toggle('active', mode === 'game');
-  document.getElementById('btn-play').style.display = (mode === 'game') ? '' : 'none';
-  if (mode === 'builder') exitTestMode();
   render();
 }
 
@@ -1093,16 +1059,14 @@ document.addEventListener('keydown', e => {
 // ─────────────────────────────────────────────
 // FILE I/O
 // ─────────────────────────────────────────────
-function validateMap() {
+document.getElementById('btn-export').addEventListener('click', () => {
   const errors = [];
   if (Object.keys(cells).length === 0) errors.push('No active cells.');
   if (!specials.player)              errors.push('No Jax start position.');
   if (!specials.exit)                errors.push('No exit position.');
   if (villainsPlaced.length === 0)   errors.push('No villains placed.');
-  return errors;
-}
+  if (errors.length) { alert('Cannot export:\n\n' + errors.join('\n')); return; }
 
-function buildMapData() {
   const metaName   = document.getElementById('meta-name').value.trim();
   const metaAuthor = document.getElementById('meta-author').value.trim();
   const metaDesc   = document.getElementById('meta-desc').value.trim();
@@ -1131,15 +1095,8 @@ function buildMapData() {
       special: cell.special,
     };
   }
-  return data;
-}
 
-document.getElementById('btn-export').addEventListener('click', () => {
-  const errors = validateMap();
-  if (errors.length) { alert('Cannot export:\n\n' + errors.join('\n')); return; }
-
-  const data = buildMapData();
-  const slug = (data.name || 'map').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = (metaName || 'map').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -1505,18 +1462,18 @@ function renderMinimap(data, cvs) {
     const [col,row] = k.split(',').map(Number);
     const x = ox + (col - minC) * cs, y = oy + (row - minR) * cs;
     const drawFn = {
-      player: (cc, x, y, s) => Sprites.drawJaxInCell(cc, x, y, s, 0, 1),
-      exit: (cc, x, y, s) => Sprites.drawExit(cc, x, y, s, 0),
-      pickup_gel: Sprites.drawGel,
-      pickup_mirror: Sprites.drawMirror,
-      pickup_spray: Sprites.drawSpray,
+      player: window.MB_drawJaxIcon,
+      exit: (cc, x, y, s) => window.MB_drawExit(cc, x, y, s, 0),
+      pickup_gel: window.MB_drawGel,
+      pickup_mirror: window.MB_drawMirror,
+      pickup_spray: window.MB_drawSpray,
     }[cell.special];
     if (drawFn) drawFn(c, x, y, cs);
   }
   // Villains
   for (const v of (data.villains || [])) {
     const x = ox + (v.col - minC) * cs, y = oy + (v.row - minR) * cs;
-    Sprites.drawChandlerInCell(c, x, y, cs, 0, 1, false);
+    if (window.MB_drawChandlerIcon) window.MB_drawChandlerIcon(c, x, y, cs);
   }
 }
 
@@ -1840,69 +1797,6 @@ async function loadDraftFromServer() {
 
 document.getElementById('btn-save-draft').addEventListener('click', () => saveDraft(false));
 document.getElementById('btn-submit').addEventListener('click', submitForReview);
-
-// ─────────────────────────────────────────────
-// TEST MODE — playable preview inside the builder
-//
-// Clicking PLAY (visible in Game view) launches /index.html?test=1 in an
-// iframe overlay. The builder posts the current map to the iframe via
-// postMessage; the iframe runs the real game with stats disabled and a
-// simplified win/loss screen. Restart re-runs the same snapshot;
-// switching back to Builder mode auto-exits.
-// ─────────────────────────────────────────────
-let testActive = false;
-let testIframeReady = false;
-let pendingTestMap = null;
-
-function postToTestIframe(msg) {
-  const iframe = document.getElementById('test-iframe');
-  if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(msg, '*');
-}
-
-function enterTestMode() {
-  const errors = validateMap();
-  if (errors.length) { alert('Cannot test:\n\n' + errors.join('\n')); return; }
-
-  pendingTestMap = buildMapData();
-  testIframeReady = false;
-  testActive = true;
-
-  const overlay = document.getElementById('test-overlay');
-  const iframe = document.getElementById('test-iframe');
-  overlay.style.display = '';
-  iframe.src = '/?test=1';  // setting src triggers reload even if already on this URL
-}
-
-function exitTestMode() {
-  if (!testActive) return;
-  testActive = false;
-  testIframeReady = false;
-  pendingTestMap = null;
-  const overlay = document.getElementById('test-overlay');
-  const iframe = document.getElementById('test-iframe');
-  overlay.style.display = 'none';
-  iframe.src = 'about:blank';  // tear down the game so its rAF loop stops
-}
-
-function restartTest() {
-  if (!testActive) return;
-  if (testIframeReady && pendingTestMap) {
-    postToTestIframe({ type: 'test:restart' });
-  }
-}
-
-window.addEventListener('message', (ev) => {
-  if (!testActive) return;
-  if (!ev.data || typeof ev.data !== 'object') return;
-  if (ev.data.type === 'test:ready') {
-    testIframeReady = true;
-    if (pendingTestMap) postToTestIframe({ type: 'test:load', map: pendingTestMap });
-  }
-});
-
-document.getElementById('btn-play').addEventListener('click', enterTestMode);
-document.getElementById('btn-test-restart').addEventListener('click', restartTest);
-document.getElementById('btn-test-exit').addEventListener('click', exitTestMode);
 
 // ─────────────────────────────────────────────
 // INIT

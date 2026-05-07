@@ -1,8 +1,8 @@
-# The Chicken Coop — Map Builder Reference
+# The Chicken Academy — Map Builder Reference
 
 ## Overview
 
-`map-builder.html` is a standalone level-design tool for The Chicken Coop. It produces versioned JSON files that describe a level's cell grid, which can be consumed by the game to generate walls, objects, and entity spawn positions.
+`map-builder.html` is a standalone level-design tool for The Chicken Academy. It produces versioned JSON files that describe a level's cell grid, which can be consumed by the game to generate walls, objects, and entity spawn positions.
 
 ---
 

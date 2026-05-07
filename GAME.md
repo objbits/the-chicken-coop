@@ -1,4 +1,4 @@
-# The Chicken Coop — Game Design & Technical Reference
+# The Chicken Academy — Game Design & Technical Reference
 
 ## Story
 Jax is a student trying to escape the school grounds before the villain **Chandler** catches him. Jax must navigate five different school locations and reach the exit in each one. Escape time is accumulated across all five levels. The player with the lowest cumulative time earns a spot on the leaderboard.

@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "name": "Untitled",
+  "author": "Unknown",
+  "description": "",
+  "chandlerSpeed": 75,
+  "playerStart": [
+    26,
+    26
+  ],
+  "exit": [
+    25,
+    25
+  ],
+  "villain": [
+    24,
+    24
+  ],
+  "pickups": {
+    "gel": null,
+    "mirror": null,
+    "spray": null
+  },
+  "cells": {
+    "24,24": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0,
+      "special": "villain"
+    },
+    "25,25": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0,
+      "special": "exit"
+    },
+    "26,26": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0,
+      "special": "player"
+    },
+    "24,26": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0,
+      "special": null
+    },
+    "26,24": {
+      "background": "hallway",
+      "borders": {
+        "n": true,
+        "s": true,
+        "e": true,
+        "w": true
+      },
+      "object": null,
+      "rotation": 0,
+      "special": null
+    }
+  }
+}

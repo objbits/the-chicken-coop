@@ -12,7 +12,6 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<script src="sprites-shared.js"></script>
 <script>
 // ─────────────────────────────────────────────
 // CONSTANTS
@@ -172,14 +171,6 @@ let winSubmitting = false;
 let winSubmitted = false;
 let winError = '';
 
-// Test mode: when ?test=1 is set in the URL, the game runs as a sandbox
-// inside the map-builder's iframe. The map is delivered via postMessage,
-// no stats are submitted, and the win/loss UI is simplified.
-const TEST_MODE = (() => {
-  try { return new URLSearchParams(location.search).has('test'); }
-  catch (_) { return false; }
-})();
-
 // ─────────────────────────────────────────────
 // PALETTE — SNES School
 // ─────────────────────────────────────────────
@@ -213,17 +204,77 @@ const PAL = {
 };
 
 // ─────────────────────────────────────────────
-// TILE CANVASES (shared with the map builder via sprites-shared.js)
+// TILE PATTERNS (offscreen canvas, cached)
 // ─────────────────────────────────────────────
+function makeHallTilePattern() {
+  const oc = document.createElement('canvas');
+  oc.width = TILE * 2; oc.height = TILE * 2;
+  const c = oc.getContext('2d');
+  // checkerboard of two close tan shades
+  c.fillStyle = PAL.floorLight; c.fillRect(0, 0, TILE*2, TILE*2);
+  c.fillStyle = PAL.floorDark;
+  c.fillRect(0, 0, TILE, TILE);
+  c.fillRect(TILE, TILE, TILE, TILE);
+  // grout lines
+  c.strokeStyle = PAL.wallMortar; c.lineWidth = 2; c.globalAlpha = 0.35;
+  c.strokeRect(1, 1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, 1, TILE-2, TILE-2);
+  c.strokeRect(1, TILE+1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, TILE+1, TILE-2, TILE-2);
+  c.globalAlpha = 1;
+  return ctx.createPattern(oc, 'repeat');
+}
+
+function makeClassTilePattern() {
+  const oc = document.createElement('canvas');
+  oc.width = TILE * 2; oc.height = TILE * 2;
+  const c = oc.getContext('2d');
+  c.fillStyle = PAL.classFloor; c.fillRect(0, 0, TILE*2, TILE*2);
+  c.fillStyle = PAL.classDark;
+  c.fillRect(0, 0, TILE, TILE);
+  c.fillRect(TILE, TILE, TILE, TILE);
+  c.strokeStyle = '#b8a882'; c.lineWidth = 1.5; c.globalAlpha = 0.3;
+  c.strokeRect(1, 1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, 1, TILE-2, TILE-2);
+  c.strokeRect(1, TILE+1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, TILE+1, TILE-2, TILE-2);
+  c.globalAlpha = 1;
+  return ctx.createPattern(oc, 'repeat');
+}
+
 let hallPattern, classPattern;
-let tileCanvases = {};
+let tilePatterns = {};
+
+function makeSolidPattern(colorA, colorB) {
+  const oc = document.createElement('canvas');
+  oc.width = TILE * 2; oc.height = TILE * 2;
+  const c = oc.getContext('2d');
+  c.fillStyle = colorA; c.fillRect(0, 0, TILE*2, TILE*2);
+  c.fillStyle = colorB;
+  c.fillRect(0, 0, TILE, TILE);
+  c.fillRect(TILE, TILE, TILE, TILE);
+  c.strokeStyle = 'rgba(0,0,0,0.15)'; c.lineWidth = 1.5;
+  c.strokeRect(1, 1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, 1, TILE-2, TILE-2);
+  c.strokeRect(1, TILE+1, TILE-2, TILE-2);
+  c.strokeRect(TILE+1, TILE+1, TILE-2, TILE-2);
+  return ctx.createPattern(oc, 'repeat');
+}
 
 function initPatterns() {
-  const kinds = ['empty','hallway','classroom','cafeteria','carpet','grass','dirt','concrete','asphalt'];
-  for (const k of kinds) tileCanvases[k] = Sprites.buildTile(k);
-  // Patterns kept for the legacy procedural drawMap() path.
-  hallPattern  = ctx.createPattern(tileCanvases.hallway, 'repeat');
-  classPattern = ctx.createPattern(tileCanvases.classroom, 'repeat');
+  hallPattern  = makeHallTilePattern();
+  classPattern = makeClassTilePattern();
+  tilePatterns = {
+    empty:      makeSolidPattern('#1a0f06', '#120a04'),
+    hallway:    hallPattern,
+    classroom:  classPattern,
+    cafeteria:  makeSolidPattern('#e0c890', '#c8b078'),
+    carpet:     makeSolidPattern('#6b7a8b', '#5a6878'),
+    grass:      makeSolidPattern('#5a8a3a', '#4a7530'),
+    dirt:       makeSolidPattern('#8b6535', '#6b4825'),
+    concrete:   makeSolidPattern('#9a9a9a', '#808080'),
+    asphalt:    makeSolidPattern('#3a3a3a', '#2a2a2a'),
+  };
 }
 
 // ─────────────────────────────────────────────
@@ -842,52 +893,31 @@ function buildObjectsFromMap(mapData) {
 function drawMapFromCells(mapData) {
   ctx.fillStyle = '#1a0f06';
   ctx.fillRect(0, 0, MAP_W, MAP_H);
-  ctx.imageSmoothingEnabled = false;
 
-  // Pass 1: floor backgrounds
   for (const [key, cell] of Object.entries(mapData.cells)) {
     const [col, row] = key.split(',').map(Number);
     const x = col * CELL, y = row * CELL;
-    const tile = tileCanvases[cell.background] || tileCanvases.empty;
-    ctx.drawImage(tile, x, y, CELL, CELL);
+    const pat = tilePatterns[cell.background] || tilePatterns.empty;
+    ctx.fillStyle = pat;
+    ctx.fillRect(x, y, CELL, CELL);
   }
 
-  // Pass 2: brick edge walls (per-side, drawn over adjacent floor)
+  // Draw border walls on top as solid dark rectangles
+  const wallKeys = new Set();
   for (const [key, cell] of Object.entries(mapData.cells)) {
     const [col, row] = key.split(',').map(Number);
     const x = col * CELL, y = row * CELL;
-    if (cell.borders.n) Sprites.drawBrickEdge(ctx, 'n', x, y, CELL);
-    if (cell.borders.s) Sprites.drawBrickEdge(ctx, 's', x, y, CELL);
-    if (cell.borders.w) Sprites.drawBrickEdge(ctx, 'w', x, y, CELL);
-    if (cell.borders.e) Sprites.drawBrickEdge(ctx, 'e', x, y, CELL);
-  }
 
-  // Pass 3: per-cell objects (locker, desk, blackboard, door, mud, pushable, wall)
-  const objDrawFn = {
-    wall: Sprites.drawWall,
-    pushable: Sprites.drawPushable,
-    mud: Sprites.drawMud,
-    locker: Sprites.drawLocker,
-    desk: Sprites.drawDesk,
-    door: Sprites.drawDoor,
-    blackboard: Sprites.drawBlackboard,
-  };
-  for (const [key, cell] of Object.entries(mapData.cells)) {
-    if (!cell.object) continue;
-    const drawFn = objDrawFn[cell.object];
-    if (!drawFn) continue;
-    const [col, row] = key.split(',').map(Number);
-    const x = col * CELL, y = row * CELL;
-    const rot = cell.rotation || 0;
-    if (rot === 0) {
-      drawFn(ctx, x, y, CELL);
-    } else {
-      ctx.save();
-      ctx.translate(x + CELL/2, y + CELL/2);
-      ctx.rotate(rot * Math.PI / 180);
-      drawFn(ctx, -CELL/2, -CELL/2, CELL);
-      ctx.restore();
+    function drawBorderWall(wkey, wx, wy, ww, wh) {
+      if (wallKeys.has(wkey)) return;
+      wallKeys.add(wkey);
+      drawWallSegment(wx, wy, ww, wh);
     }
+
+    if (cell.borders.n) drawBorderWall(`H:${col},${row}`,   x, y,                    CELL, WALL_THICK);
+    if (cell.borders.s) drawBorderWall(`H:${col},${row+1}`, x, y + CELL - WALL_THICK, CELL, WALL_THICK);
+    if (cell.borders.w) drawBorderWall(`V:${col},${row}`,   x, y,                    WALL_THICK, CELL);
+    if (cell.borders.e) drawBorderWall(`V:${col+1},${row}`, x + CELL - WALL_THICK, y, WALL_THICK, CELL);
   }
 }
 
@@ -1170,13 +1200,31 @@ function buffPushVec() {
 function drawExit(t) {
   const ex = exitPos.x, ey = exitPos.y, es = exitPos.w;
   const glow = 8 + Math.sin(t * 3) * 6;
-  const scale = 1 + Math.sin(t * 3) * 0.04;
   ctx.save();
   ctx.shadowColor = PAL.exitGlow;
   ctx.shadowBlur = glow;
+  // pulsing scale
+  const scale = 1 + Math.sin(t * 3) * 0.04;
   ctx.translate(ex + es/2, ey + es/2);
   ctx.scale(scale, scale);
-  Sprites.drawExit(ctx, -es/2, -es/2, es, t);
+  ctx.translate(-(es/2), -(es/2));
+  // checkerboard exit pattern
+  const csize = 18;
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      ctx.fillStyle = (r + c) % 2 === 0 ? PAL.exitGlow : PAL.exitDark;
+      ctx.fillRect(c * csize, r * csize, csize, csize);
+    }
+  }
+  // border
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(0, 0, es, es);
+  // label
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('EXIT', es/2, es/2 + 6);
   ctx.restore();
 }
 
@@ -1199,11 +1247,126 @@ function drawSpawnMarker(x, y, label, color) {
 }
 
 // ─────────────────────────────────────────────
-// JAX & CHANDLER sprites live in sprites-shared.js. The character art
-// is rendered via Sprites.drawJaxSprite / Sprites.drawChandlerSprite.
-// Originals (palettes + per-pixel rows) are preserved in
-// archive/index.html.pre-asset-merge.html.
+// JAX PIXEL ART SPRITE — 32×40, blonde, red polo, light skin
 // ─────────────────────────────────────────────
+// Colour palette for Jax
+const JAX_PAL = {
+  skin:      '#f5c9a0',
+  skinShad:  '#d4956a',
+  hairA:     '#e8c840',  // blonde bright
+  hairB:     '#c8a020',  // blonde shadow
+  hairC:     '#f0dc60',  // blonde highlight
+  polo:      '#cc2020',  // red polo
+  poloShad:  '#8b1010',  // polo shadow
+  poloHi:    '#e84040',  // polo highlight
+  collar:    '#ffffff',  // white collar
+  pants:     '#2a4a7a',  // navy trousers
+  pantsShad: '#1a2f50',
+  shoe:      '#1a1a1a',  // dark shoes
+  shoeSole:  '#3a3030',
+  outline:   '#1a0a00',  // dark outline
+  white:     '#ffffff',
+  eyeW:      '#e8e8e8',
+  eyeP:      '#3a2010',  // dark pupil
+  bagStrap:  '#8b6a30',  // backpack strap
+  bag:       '#6b5020',
+};
+
+// Draw one pixel (scaled 2× for crispness at game size)
+function px(ox, oy, col) {
+  ctx.fillStyle = col;
+  ctx.fillRect(ox, oy, 2, 2);
+}
+
+// Jax sprite — 16×20 logical pixels drawn at 2× = 32×40 px
+// frame: 0=idle, 1=walk-a, 2=walk-b
+// facing: 1=right, -1=left
+function drawJaxSprite(ox, oy, frame, facing) {
+  ctx.save();
+  // Flip for left-facing
+  if (facing === -1) {
+    ctx.translate(ox + 32, oy);
+    ctx.scale(-1, 1);
+    ox = 0; oy = 0;
+  }
+
+  // Helper — draw pixel row from array of [x, color]
+  function row(y, ...pixels) {
+    for (const [x, c] of pixels) px(ox + x*2, oy + y*2, c);
+  }
+
+  const S = JAX_PAL.skin, Ss = JAX_PAL.skinShad;
+  const H = JAX_PAL.hairA, Hb = JAX_PAL.hairB, Hh = JAX_PAL.hairC;
+  const P = JAX_PAL.polo, Ps = JAX_PAL.poloShad, Ph = JAX_PAL.poloHi;
+  const C = JAX_PAL.collar;
+  const N = JAX_PAL.pants, Ns = JAX_PAL.pantsShad;
+  const K = JAX_PAL.shoe, Ks = JAX_PAL.shoeSole;
+  const O = JAX_PAL.outline;
+  const Ep = JAX_PAL.eyeP, Ew = JAX_PAL.eyeW;
+
+  // Walk legs offsets
+  // frame 0: idle (feet together), 1: left forward, 2: right forward
+  const legA = frame === 1 ? -1 : (frame === 2 ? 1 : 0);  // left leg y offset
+  const legB = frame === 1 ? 1  : (frame === 2 ? -1 : 0); // right leg y offset
+
+  // ── ROW 0–1: shaggy blonde hair top ──
+  row(0,  [4,O],[5,Hb],[6,H],[7,Hh],[8,H],[9,O]);
+  row(1,  [3,O],[4,Hb],[5,H],[6,Hh],[7,H],[8,Hh],[9,H],[10,O]);
+
+  // ── ROW 2–3: hair sides + forehead ──
+  row(2,  [2,O],[3,H],[4,Hh],[5,S],[6,S],[7,S],[8,S],[9,H],[10,Hb],[11,O]);
+  row(3,  [2,Hb],[3,H],[4,S],[5,S],[6,S],[7,S],[8,S],[9,S],[10,H],[11,O]);
+
+  // ── ROW 4–5: eyes + hair sides ──
+  row(4,  [2,Hb],[3,S],[4,Ew],[5,Ep],[6,S],[7,S],[8,S],[9,Ep],[10,S],[11,Hb]);
+  row(5,  [2,O],[3,S],[4,S],[5,S],[6,S],[7,S],[8,S],[9,S],[10,S],[11,O]);
+
+  // ── ROW 6: nose/mouth area ──
+  row(6,  [3,O],[4,S],[5,S],[6,Ss],[7,S],[8,S],[9,S],[10,O]);
+
+  // ── ROW 7: chin + collar ──
+  row(7,  [4,O],[5,S],[6,S],[7,Ss],[8,S],[9,O]);
+
+  // ── ROW 8: collar / neck ──
+  row(8,  [4,O],[5,C],[6,C],[7,C],[8,C],[9,O]);
+
+  // ── ROW 9–11: polo body ──
+  row(9,  [3,O],[4,Ph],[5,P],[6,P],[7,P],[8,P],[9,P],[10,Ps],[11,O]);
+  row(10, [2,O],[3,P],[4,P],[5,P],[6,P],[7,P],[8,P],[9,P],[10,Ps],[11,O]);
+  row(11, [2,O],[3,Ph],[4,P],[5,P],[6,P],[7,P],[8,P],[9,Ps],[10,O]);
+
+  // ── ROW 12–13: arms + torso ──
+  row(12, [1,O],[2,S],[3,P],[4,P],[5,P],[6,P],[7,P],[8,P],[9,P],[10,S],[11,O]);
+  row(13, [1,Ss],[2,S],[3,Ph],[4,P],[5,P],[6,P],[7,P],[8,Ps],[9,P],[10,S],[11,Ss]);
+
+  // ── ROW 14: hands + waist ──
+  row(14, [1,O],[2,Ss],[3,O],[4,N],[5,N],[6,N],[7,N],[8,N],[9,O],[10,Ss],[11,O]);
+
+  // ── ROW 15: belt/waist ──
+  row(15, [3,O],[4,Ns],[5,N],[6,N],[7,N],[8,Ns],[9,O]);
+
+  // ── ROW 16–17: legs (animated) ──
+  // Left leg
+  const ll = 16 + legA;
+  row(Math.max(16, ll),   [3,O],[4,N],[5,N],[6,O]);
+  row(Math.max(17, ll+1), [3,N],[4,Ns],[5,N],[6,O]);
+  // Right leg
+  const rl = 16 + legB;
+  row(Math.max(16, rl),   [7,O],[8,N],[9,N],[10,O]);
+  row(Math.max(17, rl+1), [7,N],[8,Ns],[9,N],[10,O]);
+
+  // ── ROW 18–19: shoes ──
+  const sl = 18 + legA, sr = 18 + legB;
+  // Left shoe
+  row(Math.min(18, sl),   [3,O],[4,K],[5,K],[6,O]);
+  row(Math.min(19, sl+1), [3,Ks],[4,K],[5,K],[6,Ks]);
+  // Right shoe
+  row(Math.min(18, sr),   [7,O],[8,K],[9,K],[10,O]);
+  row(Math.min(19, sr+1), [7,Ks],[8,K],[9,K],[10,Ks]);
+
+  ctx.restore();
+}
+
 function drawJax() {
   const x = jax.x - 2;  // center the 32px sprite over the 28px hitbox
   const y = jax.y - 12; // sprite is 40px tall, hitbox 28px — offset up
@@ -1235,7 +1398,7 @@ function drawJax() {
     ctx.shadowBlur = 12;
   }
 
-  Sprites.drawJaxSprite(ctx, x, y, frame, jax.facing);
+  drawJaxSprite(x, y, frame, jax.facing);
 
   ctx.shadowBlur = 0;
 
@@ -1247,6 +1410,159 @@ function drawJax() {
   ctx.textAlign = 'center';
   ctx.strokeText('JAX', x + 16, y - 3);
   ctx.fillText('JAX', x + 16, y - 3);
+
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────
+// CHANDLER PIXEL ART SPRITE — 34×46 (17×23 @ 2×)
+// 50s-ish white man, white shirt, black tie, khaki pants, scissors
+// ─────────────────────────────────────────────
+const CHA_PAL = {
+  skin:     '#e8b888',   // slightly older, more weathered
+  skinShad: '#b87848',
+  skinHi:   '#f0c898',
+  wrinkle:  '#c09060',   // wrinkle/age line color
+  hair:     '#1a1a1a',   // black hair
+  hairDark: '#0a0a0a',
+  hairHi:   '#383838',   // subtle highlight
+  shirt:    '#f0f0f0',   // white shirt
+  shirtShad:'#c8c8c8',
+  shirtHi:  '#ffffff',
+  tie:      '#101010',   // black tie
+  tieHi:    '#383838',
+  tieShi:   '#080808',
+  pants:    '#b8a870',   // khaki
+  pantsSh:  '#8a7a50',
+  pantsHi:  '#d0bf90',
+  shoe:     '#2a1a0a',
+  shoeSole: '#1a0f05',
+  scisA:    '#d0d8e0',   // scissor blade silver
+  scisB:    '#909aa0',   // scissor shadow
+  scisHan:  '#c03020',   // red handle
+  scisHanD: '#801a10',
+  outline:  '#100800',
+  eyeP:     '#202020',
+  eyeW:     '#e8e8e8',
+  brow:     '#1a1a1a',   // dark brows matching hair
+  mouth:    '#9a5848',
+  O:        '#100800',
+};
+
+function drawChandlerSprite(ox, oy, frame, facing, stunned) {
+  ctx.save();
+  if (facing === -1) {
+    ctx.translate(ox + 34, oy);
+    ctx.scale(-1, 1);
+    ox = 0; oy = 0;
+  }
+
+  function row(y, ...pixels) {
+    for (const [x, c] of pixels) px(ox + x*2, oy + y*2, c);
+  }
+
+  const S = stunned ? CHA_PAL.shirtShad : CHA_PAL.skin;
+  const Ss = CHA_PAL.skinShad, Sh = CHA_PAL.skinHi;
+  const Wr = CHA_PAL.wrinkle;  // age/wrinkle tone
+  const Hr = CHA_PAL.hair, Hd = CHA_PAL.hairDark, Hh = CHA_PAL.hairHi;
+  const W = CHA_PAL.shirt, Ws = CHA_PAL.shirtShad, Wh = CHA_PAL.shirtHi;
+  const T = CHA_PAL.tie, Th = CHA_PAL.tieHi;
+  const K = CHA_PAL.pants, Ks = CHA_PAL.pantsSh, Kh = CHA_PAL.pantsHi;
+  const E = CHA_PAL.shoe, Es = CHA_PAL.shoeSole;
+  const SA = CHA_PAL.scisA, SB = CHA_PAL.scisB;
+  const SH = CHA_PAL.scisHan, SD = CHA_PAL.scisHanD;
+  const O = CHA_PAL.O;
+  const Ep = CHA_PAL.eyeP, Ew = CHA_PAL.eyeW;
+  const Br = CHA_PAL.brow;
+  const Sk = stunned ? CHA_PAL.shirtShad : CHA_PAL.skin;
+
+  // Walk frames
+  const legA = frame === 1 ? -1 : (frame === 2 ? 1 : 0);
+  const legB = frame === 1 ? 1  : (frame === 2 ? -1 : 0);
+
+  // ── ROW 0–1: black hair top (side-parted, slightly receding) ──
+  row(0,  [4,O],[5,Hd],[6,Hr],[7,Hr],[8,Hh],[9,Hr],[10,Hd],[11,O]);
+  row(1,  [3,O],[4,Hd],[5,Hr],[6,Hr],[7,Hh],[8,Hr],[9,Hr],[10,Hd],[11,O]);
+
+  // ── ROW 2: hair sides + high forehead, slight widow's peak ──
+  row(2,  [3,Hd],[4,Hr],[5,Sk],[6,Sk],[7,Sk],[8,Sk],[9,Sk],[10,Hr],[11,Hd]);
+
+  // ── ROW 3: forehead with age line ──
+  row(3,  [2,O],[3,Hd],[4,Sk],[5,Sk],[6,Wr],[7,Sk],[8,Sk],[9,Sk],[10,Hd],[11,O]);
+
+  // ── ROW 4: heavy dark brows (older, more prominent) ──
+  row(4,  [2,O],[3,Sk],[4,Br],[5,Br],[6,Br],[7,Sk],[8,Br],[9,Br],[10,Sk],[11,O]);
+
+  // ── ROW 5: deep-set eyes with crow's feet hint ──
+  row(5,  [2,Ss],[3,Sk],[4,Ew],[5,Ep],[6,Sk],[7,Sk],[8,Ew],[9,Ep],[10,Sk],[11,Ss]);
+
+  // ── ROW 6: nose, bags under eyes, jowly cheeks ──
+  row(6,  [2,Wr],[3,Sk],[4,Sk],[5,Ss],[6,Sk],[7,Sk],[8,Ss],[9,Sk],[10,Sk],[11,Wr]);
+
+  // ── ROW 7: nasolabial folds + thin firm mouth ──
+  row(7,  [3,Wr],[4,Sk],[5,Sk],[6,CHA_PAL.mouth],[7,CHA_PAL.mouth],[8,Sk],[9,Sk],[10,Wr]);
+
+  // ── ROW 8: heavy jowled chin ──
+  row(8,  [2,O],[3,Ss],[4,Sk],[5,Sk],[6,Sk],[7,Sk],[8,Sk],[9,Ss],[10,O]);
+
+  // ── ROW 9: collar + neck ──
+  row(9,  [4,O],[5,Wh],[6,Wh],[7,T],[8,Wh],[9,Wh],[10,O]);
+
+  // ── ROW 10–13: white shirt body + tie ──
+  row(10, [2,O],[3,Wh],[4,W],[5,W],[6,T],[7,T],[8,W],[9,W],[10,Ws],[11,O]);
+  row(11, [2,O],[3,W],[4,W],[5,W],[6,Th],[7,T],[8,W],[9,W],[10,Ws],[11,O]);
+  row(12, [1,O],[2,Ws],[3,W],[4,W],[5,W],[6,T],[7,T],[8,W],[9,W],[10,Ws],[11,O]);
+  row(13, [1,O],[2,W],[3,W],[4,W],[5,W],[6,Th],[7,T],[8,W],[9,Ws],[10,O]);
+
+  // ── ROW 14: arms out — RIGHT arm holds scissors ──
+  // Left arm (just sleeve)
+  row(14, [0,O],[1,Ws],[2,W],[3,W],[4,W],[5,W],[6,Th],[7,T],[8,W],[9,W],[10,W],[11,O]);
+  row(15, [0,Ss],[1,Sk],[2,Ws],[3,W],[4,W],[5,Th],[6,T],[7,T],[8,W],[9,Ws],[10,Sk],[11,Ss]);
+
+  // ── ROW 16: waist/belt ──
+  row(16, [2,O],[3,Ks],[4,K],[5,K],[6,Ks],[7,K],[8,K],[9,Ks],[10,O]);
+
+  // ── OVERSIZED SCISSORS in right hand ──
+  // Handle (rows 13–16, right side)
+  row(12, [11,O],[12,SH],[13,SH],[14,O]);
+  row(13, [11,SH],[12,SD],[13,SH],[14,SH],[15,O]);
+  row(14, [11,SH],[12,SD],[13,SH],[14,O]);
+  row(15, [11,O],[12,SH],[13,SD],[14,O]);
+  // Pivot/screw
+  row(13, [14,O],[15,SA],[16,O]);
+  // Upper blade (angled up-right)
+  row(10, [14,O],[15,SA],[16,SA],[17,SA],[18,O]);
+  row(11, [13,O],[14,SB],[15,SA],[16,SA],[17,SA],[18,SA],[19,O]);
+  row(12, [13,SA],[14,SB],[15,SA],[16,SA],[17,SA],[18,SA],[19,SA],[20,O]);
+  row(13, [14,SA],[15,SB],[16,SA],[17,SA],[18,SA],[19,O]);
+  // Lower blade (angled down-right)
+  row(14, [14,O],[15,SA],[16,SA],[17,SA],[18,SA],[19,O]);
+  row(15, [13,O],[14,SB],[15,SA],[16,SA],[17,SA],[18,SA],[19,SA],[20,O]);
+  row(16, [13,SA],[14,SB],[15,SA],[16,SA],[17,SA],[18,O]);
+  row(17, [14,O],[15,SA],[16,SA],[17,O]);
+  // Blade tips (sharp points)
+  row(9,  [18,O],[19,SA],[20,SA],[21,O]);
+  row(10, [19,O],[20,SA],[21,O]);
+  row(18, [17,O],[18,SA],[19,SA],[20,O]);
+  row(19, [18,O],[19,SA],[20,O]);
+
+  // ── ROWS 17–19: legs (animated) ──
+  const ll = 17 + legA, rl = 17 + legB;
+  // Left leg
+  row(Math.max(17,ll),   [3,O],[4,Kh],[5,K],[6,O]);
+  row(Math.max(18,ll+1), [3,K],[4,Ks],[5,K],[6,O]);
+  row(Math.max(19,ll+2), [3,K],[4,Ks],[5,Kh],[6,O]);
+  // Right leg
+  row(Math.max(17,rl),   [7,O],[8,Kh],[9,K],[10,O]);
+  row(Math.max(18,rl+1), [7,K],[8,Ks],[9,K],[10,O]);
+  row(Math.max(19,rl+2), [7,K],[8,Ks],[9,Kh],[10,O]);
+
+  // ── ROWS 20–22: shoes ──
+  const sl = 20 + legA, sr = 20 + legB;
+  row(Math.min(20,sl),   [3,O],[4,E],[5,E],[6,O]);
+  row(Math.min(21,sl+1), [2,O],[3,Es],[4,E],[5,E],[6,Es],[7,O]);
+  row(Math.min(20,sr),   [7,O],[8,E],[9,E],[10,O]);
+  row(Math.min(21,sr+1), [6,O],[7,Es],[8,E],[9,E],[10,Es],[11,O]);
 
   ctx.restore();
 }
@@ -1281,7 +1597,7 @@ function drawVillain(v) {
     ctx.shadowBlur = 16;
   }
 
-  Sprites.drawChandlerSprite(ctx, x, y, frame, v.facing || 1, stunned);
+  drawChandlerSprite(x, y, frame, v.facing || 1, stunned);
 
   ctx.shadowBlur = 0;
 
@@ -1310,18 +1626,11 @@ function drawVillain(v) {
   ctx.restore();
 }
 
-const PICKUP_SPRITE_FN = {
-  hair_gel: Sprites.drawGel,
-  mirror: Sprites.drawMirror,
-  hairspray: Sprites.drawSpray,
-};
-
 function drawPickupObjects(t) {
   for (const o of objects) {
     if (o.kind !== 'pickup') continue;
     const def = PICKUP_DEFS[o.type];
-    const drawFn = PICKUP_SPRITE_FN[o.type];
-    if (!def || !drawFn) continue;
+    if (!def) continue;
     const pulse = 0.92 + Math.sin(t * 3 + o.pulse) * 0.08;
     const s = o.w;
     ctx.save();
@@ -1329,7 +1638,21 @@ function drawPickupObjects(t) {
     ctx.scale(pulse, pulse);
     ctx.shadowColor = def.color;
     ctx.shadowBlur = 10;
-    drawFn(ctx, -s/2, -s/2, s);
+    // background
+    ctx.fillStyle = def.color;
+    ctx.fillRect(-s/2, -s/2, s, s);
+    // highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillRect(-s/2 + 2, -s/2 + 2, 6, 4);
+    // border
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-s/2, -s/2, s, s);
+    // label
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 7px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(def.label, 0, 3);
     ctx.restore();
   }
 }
@@ -1337,7 +1660,26 @@ function drawPickupObjects(t) {
 function drawChairs() {
   for (const o of objects) {
     if (o.kind !== 'pushable') continue;
-    Sprites.drawPushable(ctx, o.x, o.y, o.w);
+    ctx.save();
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(o.x + 3, o.y + o.h, o.w - 3, 5);
+    // seat top
+    ctx.fillStyle = '#8b6040';
+    ctx.fillRect(o.x, o.y, o.w, o.h);
+    // highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(o.x + 2, o.y + 2, 6, 3);
+    // dark edge
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(o.x + o.w - 5, o.y + 3, 4, o.h - 3);
+    ctx.fillRect(o.x + 3, o.y + o.h - 5, o.w - 3, 4);
+    // backrest
+    ctx.fillStyle = '#6b4828';
+    ctx.fillRect(o.x + 2, o.y - 10, o.w - 4, 10);
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(o.x + 3, o.y - 9, 4, 8);
+    ctx.restore();
   }
 }
 
@@ -1444,11 +1786,6 @@ function drawGameOver() {
 
   buttons = [];
   drawButton(VW/2 - 100, VH/2 + 100, 200, 50, 'TRY AGAIN', villain.color, '#ffffff');
-  if (TEST_MODE) {
-    ctx.fillStyle = '#888888';
-    ctx.font = '14px monospace';
-    ctx.fillText('Test mode — no stats recorded', VW/2, VH/2 + 180);
-  }
   ctx.restore();
 }
 
@@ -1472,16 +1809,6 @@ function drawWin() {
   y += 52;
 
   buttons = [];
-
-  if (TEST_MODE) {
-    ctx.fillStyle = '#888888';
-    ctx.font = '14px monospace';
-    ctx.fillText('Test mode — no stats recorded', cx, y);
-    y += 30;
-    drawButton(cx - 110, y, 220, 48, 'PLAY AGAIN', '#00aa55', '#ffffff');
-    ctx.restore();
-    return;
-  }
 
   if (winSubmitted) {
     ctx.fillStyle = '#00ff88';
@@ -1527,7 +1854,6 @@ function drawWin() {
 }
 
 function submitWinScore() {
-  if (TEST_MODE) return;
   if (winSubmitting || winSubmitted) return;
   const name = winName.trim();
   if (!name) { winError = 'Enter your name first'; return; }
@@ -2346,12 +2672,12 @@ function drawLobbySprite(cx, cy, who, t) {
     ctx.scale(2.4, 2.4);
     const cycle = (t * 6) % 2;
     const frame = cycle < 1 ? 1 : 2;
-    Sprites.drawJaxSprite(ctx, -16, -20, frame, 1);
+    drawJaxSprite(-16, -20, frame, 1);
   } else {
     ctx.scale(2.2, 2.2);
     const cycle = (t * 5) % 2;
     const frame = cycle < 1 ? 1 : 2;
-    Sprites.drawChandlerSprite(ctx, -17, -23, frame, -1, false);
+    drawChandlerSprite(-17, -23, frame, -1, false);
   }
   ctx.restore();
 }
@@ -2674,12 +3000,6 @@ let t = 0;
 function draw(dt) {
   ctx.clearRect(0, 0, VW, VH);
 
-  if (gameState === 'test_idle') {
-    buttons = [];
-    drawTestIdle();
-    return;
-  }
-
   if (gameState === 'lobby') {
     buttons = [];
     canvas.classList.add('lobby');
@@ -2744,60 +3064,12 @@ function loop(ts) {
 }
 
 // ─────────────────────────────────────────────
-// TEST MODE — sandbox runner controlled by the map-builder via postMessage.
-// Parent posts { type: 'test:load', map } to start, { type: 'test:restart' }
-// to replay. We respond with { type: 'test:ready' } after init and
-// { type: 'test:state', state } whenever the game state changes.
-// ─────────────────────────────────────────────
-function setupTestMode() {
-  function applyTestMap(mapData) {
-    if (!mapData || !mapData.cells) return;
-    currentMapData = mapData;
-    currentLevelCode = 'TEST';
-    let maxCol = 0, maxRow = 0;
-    for (const k of Object.keys(mapData.cells)) {
-      const [c, r] = k.split(',').map(Number);
-      if (c > maxCol) maxCol = c;
-      if (r > maxRow) maxRow = r;
-    }
-    MAP_W = (maxCol + 1) * CELL;
-    MAP_H = (maxRow + 1) * CELL;
-    resetLevel(); // sets gameState = 'playing'
-  }
-
-  window.addEventListener('message', (ev) => {
-    const msg = ev.data;
-    if (!msg || typeof msg !== 'object') return;
-    if (msg.type === 'test:load') applyTestMap(msg.map);
-    else if (msg.type === 'test:restart' && currentMapData) resetLevel();
-  });
-
-  if (window.parent && window.parent !== window) {
-    window.parent.postMessage({ type: 'test:ready' }, '*');
-  }
-}
-
-function drawTestIdle() {
-  ctx.fillStyle = '#1a0f06';
-  ctx.fillRect(0, 0, VW, VH);
-  ctx.fillStyle = '#a08858';
-  ctx.font = 'bold 24px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('Loading test map…', VW/2, VH/2);
-}
-
-// ─────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────
 initPatterns();
-if (TEST_MODE) {
-  gameState = 'test_idle';
-  setupTestMode();
-} else {
-  resetLevel();
-  gameState = 'lobby';
-  handleRoute();
-}
+resetLevel();
+gameState = 'lobby';
+handleRoute();
 requestAnimationFrame(loop);
 </script>
 </body>
