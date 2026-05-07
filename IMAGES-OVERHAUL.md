@@ -1,6 +1,6 @@
 # Images / Object & Terrain System — Overhaul Proposal
 
-**Status:** draft, for review
+**Status:** decisions locked, ready for implementation planning
 **Owner:** Josh
 **Last updated:** 2026-05-07
 
@@ -468,29 +468,36 @@ The loader must handle `version: 1` (current format) by reading `cell.object` / 
 
 ---
 
-## 8. Open questions for review
+## 8. Decisions
 
-1. **Walls.** Today walls are drawn as cell borders (`cell.borders.{n,s,e,w}`), not as objects. Should walls fold into the edge-anchored object model, or stay as a separate border layer? Folding them in unifies the system but is a bigger migration.
-2. **Asset pipeline.** Where do PNGs live (`assets/objects/...`)? Are they hand-authored, or do we keep the procedural draws and just bake them out to PNG as a build step? Baking-out is cheap and means we don't lose the existing art.
-3. **Sprite resolution.** 64×64 per tile? Higher (e.g. 128×128) for crispness on zoom-in? This affects file size and load time meaningfully across 30+ objects × up to 4 rotations.
-4. **Mirror symmetry tier.** Worth supporting in v1 (saves art on bilaterally-symmetric `quad` pieces), or defer? My recommendation: defer — adds renderer complexity, and most existing objects fit cleanly into the three tiers.
-5. **Multi-tile collision rules.** If a 1×2 desk overlaps an existing 1×1 chair, what's the behavior — reject placement, auto-erase the chair, or show a confirmation? I'd default to **reject**, matching how invalid placements work today.
-6. **Z-order.** With multi-tile and edge-anchored objects, draw order starts to matter (a tall edge wall behind a center-anchored desk in the same row). Do we just sort by `(row, anchor=='edge' ? 0 : 1)` or do we need explicit per-object `z`?
-7. **Terrain blending technique.** §5.3 recommends mask blending (A). Sign off on that, or push toward Wang tiles (B) if the look isn't crisp enough? This is the highest-impact decision because it sets the asset workload.
-8. **Terrain priority assignments.** Need an explicit priority table for every terrain pair. Strawman: `sand(80) > dirt(70) > gravel(60) > snow(40) > ice(30) > grass(20)` for organic; built terrain (concrete/asphalt/floor) probably shouldn't blend into organic at all and stays at sharp edges. Worth a short review pass.
-9. **Variant count per terrain.** 2 is enough to break the most obvious patterns; 4 looks much better but quadruples the art workload. Do we set a uniform target (e.g. "all terrains ship 3 variants") or allow per-terrain variation?
-10. **Decals — auto-placed vs hand-placed.** §3.8 / §4.4 describe deterministic auto-placed decals (flowers in grass, etc.). Should the editor *also* let users place specific decals manually for set pieces? If yes, decals graduate into objects with their own `kind: 'decal'`.
-11. **Windows.** A window logically belongs *in* a wall, not next to one. Three options: (a) treat it as just another edge object that *replaces* the wall on that edge; (b) make it a wall variant — the Brick/Concrete/Rusty wall types each get a "with window" sub-variant; (c) layer it as a decal on top of an edge wall object. (a) is simplest; (b) gives the cleanest art since the wall and window are drawn together.
-12. **Sink & Mirror.** Your list groups them. Existing `sink` is just the basin. Two interpretations: (a) one combined "Sink with Mirror" sprite that's center-anchored on a cell against a wall; (b) sink is center-anchored, mirror is a separate edge-anchored object you place on the wall behind it. (a) is one asset and easier; (b) is more flexible if mirror is sometimes used solo.
-13. **Mud — object or terrain?** Today `mud` is an object (`kind: 'sticky'`) that slows the player. Your list has it under Flooring. If we move it to terrain, the slow-player game logic needs a way to attach to terrain types (a `slows: true` flag in the terrain catalog). Recommendation: move to terrain with the flag — it matches player intuition.
-14. **Themed school floors.** Existing terrains `hallway`, `classroom`, `cafeteria`, `carpet` aren't in your list. Are these legacy from an earlier theme that's being replaced by the new Marble/White/Wooden Floor / Tiles set? If yes, they retire (with a save migration). If no, they need to coexist — but then "Marble Tiles" might just be a relabeled `hallway`, etc.
-15. **Locked Door.** Visually distinct sprite, or same sprite as Door with an overlay icon (lock badge)? If same sprite + overlay, it's one art asset and a `locked: true` flag. If distinct, it's a full new entry.
-16. **Animated terrain — Water (and Campfire).** Water needs animation to look right; static water reads as cracked glass. Campfire today is procedurally drawn so animation comes free. The catalog schema doesn't currently support frame sets. Either (a) keep both as procedural exceptions, (b) extend the schema with `frames: [...]` + `fps`, or (c) defer animation and ship static water for v1.
-17. **New categories.** Confirm the two added categories from §6.2:
-    - **Storage / Containers** (locker, barrel, crate, backpack, filing cabinet)
-    - **Sports / Recreation** (basketball, dodgeball, soccerball, baseball, cone, sportsbag, hurdle)
-    
-    And whether **Decoration / Signage** should be its own category or stay folded under Foliage.
+All resolved on 2026-05-07. Listed in order with the resolution and any implementation note.
+
+| # | Topic | Decision | Note |
+|---|---|---|---|
+| 1 | Walls | **Fold into edge-anchored objects.** | Brick Wall, Concrete Wall, Rusty Wall, Hedge, Fence all become edge objects. Save migration converts `cell.borders.*` to placed edge objects. |
+| 2 | Asset pipeline | **AI-generated sprites via Claude Design**, fed this doc as input. | Existing procedural draws are fully replaced. Need a Style Spec section (§11) so generation is consistent across 50+ items. |
+| 3 | Sprite resolution | **64×64 per tile.** | 1×2 piece = 64×128 PNG; 2×2 = 128×128. Crisp at default zoom, matches current `cellSize`. |
+| 4 | Mirror symmetry tier | **Defer to v2.** | Three tiers in v1: full / axis / quad. AI generation makes the asset-saving argument weak. |
+| 5 | Multi-tile collision | **Reject placement.** | Hover preview turns red on any overlap. User must manually erase before placing. |
+| 6 | Z-order | **Implicit by row + anchor.** | Painter's algorithm: sort by row; within a row, edge before center. Multi-tile uses bottom row for sort. |
+| 7 | Terrain blending | **Mask blending — 8 shared masks.** | Single mask set reused across every terrain pair. Asset cost: 8 masks + per-terrain base variants. |
+| 8 | Terrain priority | **Two-group model approved as-is.** | Organic group (Snow 100, Ice 90, Mud 80, Sand 70, Dirt 60, Gravel 50, Long Grass 40, Grass 30) blends via masks. Sharp group (Water, Stone, Road, Concrete Tiles, Concrete Floor, Wooden, Marble, White, Fancy) has hard edges. |
+| 9 | Variant count | **Per-terrain custom.** | Organic 3–4 variants, snow/ice 2, built floors 2, marble/white/fancy 1 (uniform pattern). |
+| 10 | Decals | **Auto-placed only.** | Deterministic from `(col, row, terrain)` hash. Hand-placed decoration uses existing object system (sign, flag, gravestone are objects). |
+| 11 | Windows | **Own edge object, replaces wall on the edge.** | Edge slot holds one of {wall, fence, hedge, door, gate, window}. Likely needs a window sprite per wall material (brick window, concrete window, rusty window) so the frame matches its neighbors. |
+| 12 | Sink & Mirror | **One combined sprite.** | Single `sink_mirror` catalog entry. Always renders against a wall by convention. Note: gameplay `pickup_mirror` is unrelated. |
+| 13 | Mud | **Move to terrain with `slows: true`.** | Terrain catalog gains gameplay flags. Game logic checks cell terrain for slow effect. Existing `mud` object retires; save migration converts mud-object cells to mud-terrain. |
+| 14 | School floors | **Retire with save migration.** | `hallway → marble_tiles`, `classroom → white_tiles`, `cafeteria → wooden_floor`, `carpet → wooden_floor`. Loader rewrites old terrain ids on read. |
+| 15 | Locked Door | **Same Door sprite + lock-badge overlay + `locked: true` flag.** | One door art asset. Editor toggles `locked` in the context panel. |
+| 16 | Animation | **Extend schema with `frames` + `fps` in v1.** | Catalog entries (object or terrain) can declare frame sets. Renderer cycles frames over time. Used by Water, Campfire; leaves room for TV, fountain, future animated items. |
+| 17 | New categories | **Approve all three.** | Final 12 categories: Furniture & Seating, Entertainment, Plumbing, Electronics & Lighting, Exercise, Foliage, Doors & Gates, Walls, Flooring, Work / Shop / Catering, Storage / Containers, Sports / Recreation, Decoration / Signage. |
+
+### 8.1 Cross-cutting consequences
+
+- **Save format** (§7) needs migration paths for: walls (`cell.borders` → placed edge objects), mud (object cell → terrain), school floors (terrain rename), and existing 1×1 desk → 1×2 desk.
+- **Style Spec** (§11, to be added) is now a hard prerequisite — Claude Design needs it before generating any sprite to avoid style drift across 50+ items.
+- **Animation schema** affects both object and terrain catalog entries; bake into v1 data model from the start, not a follow-up.
+- **Edge-object slot** must enforce one occupant per edge across the full {wall, fence, hedge, door, gate, window} set.
 
 ---
 
